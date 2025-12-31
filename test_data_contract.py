@@ -25,7 +25,7 @@ def test_basic_creation():
         score=85,
         tags=['BREAKOUT'],
         stop_loss=175.00,
-        risk_pct=-3.05,
+        risk_pct=3.05,  # stored as positive percentage
         metadata={'momentum_20d': 15.2, 'volume_ratio': 2.1}
     )
 
@@ -52,7 +52,7 @@ def test_basic_creation():
             AnomalyTags.CLEAR_STRUCTURE
         ],
         stop_loss=510.00,
-        risk_pct=-1.92,
+        risk_pct=1.92,  # stored as positive percentage
         metadata={'volatility_ratio': 2.5, 'volume_ratio': 2.8}
     )
 
@@ -121,7 +121,7 @@ def test_serialization():
         score=80,
         tags=[AnomalyTags.BREAKOUT, AnomalyTags.VOLUME_SPIKE],
         stop_loss=140.00,
-        risk_pct=-3.45,
+        risk_pct=3.45,  # stored as positive percentage
         metadata={'breakout_level': 144.50}
     )
 
@@ -173,7 +173,22 @@ def test_validation():
 
     print()
 
-    # Test positive risk_pct (should be negative)
+    # Test valid 'both' source
+    try:
+        WatchlistCandidate(
+            symbol='TEST',
+            date='2024-12-30',
+            close=100.0,
+            source='both',  # Valid: dual-confirmed
+            score=85
+        )
+        print("[OK] Correctly accepted source='both'")
+    except AssertionError as e:
+        print(f"[FAIL] Should have accepted source='both': {e}")
+
+    print()
+
+    # Test invalid risk_pct (should be 0-100)
     try:
         WatchlistCandidate(
             symbol='TEST',
@@ -181,11 +196,11 @@ def test_validation():
             close=100.0,
             source='momentum',
             score=50,
-            risk_pct=3.5  # Invalid: should be negative
+            risk_pct=150  # Invalid: > 100
         )
-        print("[FAIL] Should have raised assertion error for positive risk_pct")
+        print("[FAIL] Should have raised assertion error for risk_pct > 100")
     except AssertionError as e:
-        print(f"[OK] Correctly rejected positive risk_pct: {e}")
+        print(f"[OK] Correctly rejected invalid risk_pct: {e}")
 
     print()
     print("[OK] All validation tests passed")

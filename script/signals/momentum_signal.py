@@ -80,7 +80,7 @@ class MomentumSignal(SignalScanner):
 
                     # Calculate stop loss
                     stop_loss = momentum_data['price'] * 0.95  # -5%
-                    risk_pct = -5.0
+                    risk_pct = 5.0  # stored as positive percentage
 
                     # Create candidate
                     candidate = WatchlistCandidate(

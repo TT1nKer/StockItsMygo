@@ -253,12 +253,12 @@ class AnomalySignal(SignalScanner):
         # Stop loss: slightly below swing low
         stop_loss = swing_low * 0.98
 
-        # Risk percentage
+        # Risk percentage (stored as positive value)
         if latest['close'] > 0:
-            risk_pct = (stop_loss - latest['close']) / latest['close'] * 100
+            risk_pct = abs((latest['close'] - stop_loss) / latest['close'] * 100)
 
             # Structure is clear if risk is reasonable (<7%)
-            detected = -7.0 < risk_pct < 0
+            detected = 0 < risk_pct < 7.0
 
             return {
                 'detected': detected,

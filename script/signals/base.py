@@ -28,20 +28,24 @@ class WatchlistCandidate:
     close: float
 
     # 来源标识
-    source: Literal['momentum', 'anomaly']
+    # 'momentum': 趋势信号
+    # 'anomaly': 异常信号
+    # 'both': 双重确认（由 workflow 在合并时标记）
+    source: Literal['momentum', 'anomaly', 'both']
 
     # 评分 (0-100)
     score: int
 
     # 分类标签（用于报告分组）
-    # STRUCTURAL tags: VOLATILITY_EXPANSION, VOLUME_SPIKE, CLEAR_STRUCTURE,
-    #                  GAP, BREAKOUT, SQUEEZE_RELEASE
-    # AUXILIARY tags: DOLLAR_VOLUME, MOMENTUM_CONFIRM
+    # TODO v2.2: Refactor to separate event_tags / feature_tags namespaces
+    # - event_tags (STRUCTURAL): GAP_REV, GAP_CONT, SQUEEZE_RELEASE, BREAKOUT
+    # - feature_tags (EXPLANATORY): VOLATILITY_EXPANSION, VOLUME_SPIKE, CLEAR_STRUCTURE, DOLLAR_VOLUME, MOMENTUM_CONFIRM
+    # Current (v2.1): Mixed usage, backward compatible
     tags: List[str] = field(default_factory=list)
 
     # 风险参数（如有）
     stop_loss: Optional[float] = None
-    risk_pct: Optional[float] = None  # 止损百分比
+    risk_pct: Optional[float] = None  # 止损幅度（正数百分比，0-100）
 
     # 元数据（供报告详细展示）
     # 例: {'momentum_20d': 15.2, 'volume_ratio': 2.3, 'volatility': 3.5}
@@ -50,10 +54,10 @@ class WatchlistCandidate:
     def __post_init__(self):
         """验证数据有效性"""
         assert 0 <= self.score <= 100, f"Score must be 0-100, got {self.score}"
-        assert self.source in ['momentum', 'anomaly'], f"Invalid source: {self.source}"
+        assert self.source in ['momentum', 'anomaly', 'both'], f"Invalid source: {self.source}"
 
         if self.risk_pct is not None:
-            assert self.risk_pct < 0, "risk_pct should be negative (e.g., -3.5)"
+            assert 0 <= self.risk_pct <= 100, f"risk_pct must be 0-100 (positive percentage), got {self.risk_pct}"
 
     def has_tag(self, tag: str) -> bool:
         """检查是否包含指定标签"""
