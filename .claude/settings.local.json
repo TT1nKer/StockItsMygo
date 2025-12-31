@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(dir:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout:*)",
+      "Bash(powershell -Command \"Start-Sleep -Seconds 180; Get-Content ''C:\\\\Users\\\\hosts\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--strategy-Z\\\\tasks\\\\bfeb8a2.output'' | Select-Object -Last 50\")",
+      "Bash(powershell:*)",
+      "Bash(ls -la \"d:\\\\strategy=Z\\\\tools\"\" 2>/dev/null || echo \"tools folder not found \")",
+      "Bash(ls -la \"d:\\\\strategy=Z\\\\db\"\" 2>/dev/null || echo \"db folder not found \")",
+      "Bash(sqlite3:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
