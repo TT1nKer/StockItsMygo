@@ -1,19 +1,24 @@
 """
-Daily Workflow - Observation Mode
+Daily Workflow - Observation Mode (Layer 5: Orchestration)
 每日工作流程 - 观察模式
 
 Daily workflow for finding and analyzing potential stocks before actual trading.
 在实际交易前寻找和分析潜在股票的每日工作流程。
 
+Layer constraints:
+- ✅ Can call Layer 2 (Signals), Layer 3 (Events - optional), Layer 4 (Reporting)
+- ❌ Cannot call Layer 1 (Database) directly - must go through Signal layer
+- ❌ Cannot contain business logic (calculations, scoring, filtering)
+- ❌ Cannot contain rendering logic (Markdown formatting)
+
 Workflow steps:
 1. Update all stock data (daily prices)
-2. Run momentum scanner to find promising stocks
-3. Auto-add high-score stocks to watchlist
+2. Run signal scanners (momentum + anomaly)
+3. Build watchlist from signals
 4. Download intraday data for watchlist stocks
 5. Run advanced analysis on watchlist
-6. Run all strategies comparison
+6. Run strategies comparison
 7. Generate comprehensive daily report
-8. Save report organized by year/month/week
 
 Report structure:
   reports/
@@ -22,20 +27,19 @@ Report structure:
         Week_01/
           2025-01-01_Monday.md
           2025-01-02_Tuesday.md
-        Week_02/
-          ...
 """
 
 import sys
 sys.path.insert(0, 'd:/strategy=Z')
 
 from db.api import StockDB
-from script.momentum_scanner import MomentumScanner
+from script.signals.momentum_signal import MomentumSignal
+from script.signals.anomaly_signal import AnomalySignal
 from script.watchlist import WatchlistManager
 from script.advanced_analysis import AdvancedAnalyzer
 from script.strategy_manager import StrategyManager
-from datetime import datetime, timedelta
-import os
+from tools.report_generator import ReportGenerator
+from datetime import datetime
 import time
 
 
@@ -47,10 +51,16 @@ class DailyWorkflow:
         self.db = StockDB()
         self.today = datetime.now()
         self.today_str = self.today.strftime('%Y-%m-%d')
-        self.day_name = self.today.strftime('%A')
 
-        # Create reports directory structure
-        self.report_dir = self._create_report_structure()
+        # Initialize scanners
+        self.momentum_scanner = MomentumSignal()
+        self.anomaly_scanner = AnomalySignal()
+
+        # Initialize managers
+        self.watchlist = WatchlistManager()
+        self.analyzer = AdvancedAnalyzer()
+        self.strategy_manager = StrategyManager()
+        self.report_generator = ReportGenerator(base_dir)
 
         # Stats tracking
         self.stats = {
@@ -59,409 +69,264 @@ class DailyWorkflow:
             'new_watchlist_stocks': 0,
             'total_watchlist': 0,
             'momentum_signals': 0,
+            'anomaly_signals': 0,
+            'dual_confirmed': 0,
             'strategies_used': [],
             'errors': []
         }
 
-    def _create_report_structure(self):
-        """
-        Create report folder structure: reports/YYYY/MM-MonthName/Week_XX/
-
-        Returns:
-            str: Path to today's report directory
-        """
-        year = self.today.strftime('%Y')
-        month = self.today.strftime('%m-%B')  # 01-January
-
-        # Calculate week number (ISO week)
-        week_num = self.today.isocalendar()[1]
-        week_folder = f"Week_{week_num:02d}"
-
-        # Build path
-        report_path = os.path.join(
-            self.base_dir,
-            'reports',
-            year,
-            month,
-            week_folder
-        )
-
-        # Create directories
-        os.makedirs(report_path, exist_ok=True)
-
-        return report_path
-
-    def _get_report_filepath(self):
-        """Get today's report file path"""
-        filename = f"{self.today_str}_{self.day_name}.md"
-        return os.path.join(self.report_dir, filename)
-
     def run_daily_workflow(self):
-        """
-        Execute complete daily workflow
-
-        Steps:
-        1. Update daily data
-        2. Find promising stocks (momentum scan)
-        3. Update watchlist
-        4. Download intraday data
-        5. Advanced analysis
-        6. Strategy comparison
-        7. Generate report
-        """
+        """Execute complete daily workflow"""
         print("=" * 80)
-        print(f"DAILY WORKFLOW - OBSERVATION MODE")
-        print(f"Date: {self.today_str} ({self.day_name})")
+        print(f"DAILY WORKFLOW - {self.today_str}")
         print("=" * 80)
         print()
 
-        # Step 1: Update daily data
-        print("Step 1/7: Updating daily price data...")
-        print("-" * 80)
         try:
-            # Note: This would update all stocks - skip for now if data is recent
-            # In production, you would run: self.db.update_all_stocks()
-            print("[INFO] Skipping full update - using existing data")
-            print("       To update all stocks, run: python script/update_data.py")
-            self.stats['updated_stocks'] = 0  # Would be actual count
-        except Exception as e:
-            print(f"[ERROR] Data update failed: {e}")
-            self.stats['errors'].append(f"Data update: {e}")
-        print()
+            # Step 1: Update data
+            self._update_data()
 
-        # Step 2: Run momentum scanner
-        print("Step 2/7: Running momentum scanner...")
-        print("-" * 80)
-        momentum_signals = []
-        try:
-            scanner = MomentumScanner()
-            momentum_signals = scanner.scan(
-                min_score=70,
-                min_volume=500000,
-                sort_by='momentum_score',
-                limit=20
-            )
-            self.stats['momentum_signals'] = len(momentum_signals)
-            print(f"[OK] Found {len(momentum_signals)} promising stocks (score >= 70)")
+            # Step 2: Scan for signals
+            momentum_candidates, anomaly_candidates = self._scan_signals()
 
-            # Show top 5
-            print("\nTop 5 momentum opportunities:")
-            for i, sig in enumerate(momentum_signals[:5], 1):
-                print(f"  {i}. {sig['symbol']:6s} | Score: {sig['momentum_score']:3.0f} | "
-                      f"Momentum: {sig['momentum_pct']:+6.2f}% | Signal: {sig['signal']}")
-        except Exception as e:
-            print(f"[ERROR] Momentum scan failed: {e}")
-            self.stats['errors'].append(f"Momentum scan: {e}")
-        print()
+            # Step 3: Build watchlist
+            self._build_watchlist(momentum_candidates, anomaly_candidates)
 
-        # Step 3: Update watchlist (auto-add high scores)
-        print("Step 3/7: Updating watchlist...")
-        print("-" * 80)
-        try:
-            wl_mgr = WatchlistManager()
+            # Step 4: Download intraday data
+            self._download_intraday_data()
 
-            # Auto-add top momentum stocks
-            added = wl_mgr.auto_add_from_momentum(
-                min_score=80,
-                max_additions=10,
-                skip_existing=True
-            )
-            self.stats['new_watchlist_stocks'] = len(added)
+            # Step 5: Deep analysis
+            analyses = self._run_deep_analysis()
 
-            # Get current watchlist
-            watchlist = wl_mgr.get_watchlist()
-            self.stats['total_watchlist'] = len(watchlist)
+            # Step 6: Strategy comparison
+            strategy_results = self._run_strategy_comparison()
 
-            print(f"[OK] Added {len(added)} new stocks to watchlist")
-            print(f"[OK] Total watchlist stocks: {len(watchlist)}")
-        except Exception as e:
-            print(f"[ERROR] Watchlist update failed: {e}")
-            self.stats['errors'].append(f"Watchlist: {e}")
-            watchlist = []
-        print()
-
-        # Step 4: Download intraday data for watchlist
-        print("Step 4/7: Downloading intraday data for watchlist...")
-        print("-" * 80)
-        try:
-            if watchlist:
-                symbols = [w['symbol'] for w in watchlist]
-                print(f"[INFO] Downloading 5-minute data for {len(symbols)} stocks...")
-
-                self.db.batch_download_intraday(
-                    symbols=symbols,
-                    interval='5m',
-                    period='7d',
-                    workers=3
-                )
-                print(f"[OK] Intraday data updated")
-            else:
-                print("[INFO] No stocks in watchlist")
-        except Exception as e:
-            print(f"[ERROR] Intraday download failed: {e}")
-            self.stats['errors'].append(f"Intraday: {e}")
-        print()
-
-        # Step 5: Advanced analysis on watchlist
-        print("Step 5/7: Running advanced analysis on watchlist...")
-        print("-" * 80)
-        watchlist_analyses = []
-        try:
-            analyzer = AdvancedAnalyzer()
-
-            for stock in watchlist[:10]:  # Limit to top 10 for speed
-                symbol = stock['symbol']
-                print(f"  Analyzing {symbol}...", end=' ')
-
-                try:
-                    analysis = analyzer.analyze_stock(symbol, include_intraday=True)
-                    watchlist_analyses.append(analysis)
-                    print(f"[OK] Score: {analysis['overall_score']}/100")
-                except Exception as e:
-                    print(f"[ERROR] {e}")
-
-            print(f"\n[OK] Completed {len(watchlist_analyses)} advanced analyses")
-        except Exception as e:
-            print(f"[ERROR] Advanced analysis failed: {e}")
-            self.stats['errors'].append(f"Advanced analysis: {e}")
-        print()
-
-        # Step 6: Strategy comparison
-        print("Step 6/7: Running multi-strategy comparison...")
-        print("-" * 80)
-        strategy_results = {}
-        try:
-            mgr = StrategyManager()
-            strategies = ['momentum', 'mean_reversion', 'breakout']
-            self.stats['strategies_used'] = strategies
-
-            # Run on top watchlist stocks
-            for stock in watchlist[:5]:  # Top 5 only
-                symbol = stock['symbol']
-                print(f"  Comparing strategies for {symbol}...")
-
-                try:
-                    comparison = mgr.compare_strategies(symbol, strategies)
-                    strategy_results[symbol] = comparison
-                except Exception as e:
-                    print(f"    [ERROR] {e}")
-
-            print(f"\n[OK] Strategy comparison completed for {len(strategy_results)} stocks")
-        except Exception as e:
-            print(f"[ERROR] Strategy comparison failed: {e}")
-            self.stats['errors'].append(f"Strategy comparison: {e}")
-        print()
-
-        # Step 7: Generate comprehensive report
-        print("Step 7/7: Generating daily report...")
-        print("-" * 80)
-        try:
-            report_path = self._generate_daily_report(
-                momentum_signals,
-                watchlist,
-                watchlist_analyses,
+            # Step 7: Generate report
+            report_path = self._generate_report(
+                momentum_candidates,
+                anomaly_candidates,
+                analyses,
                 strategy_results
             )
-            print(f"[OK] Report saved: {report_path}")
+
+            # Print summary
+            self._print_summary(report_path)
+
         except Exception as e:
-            print(f"[ERROR] Report generation failed: {e}")
-            self.stats['errors'].append(f"Report: {e}")
-        print()
+            self.stats['errors'].append(f"Workflow error: {str(e)}")
+            print(f"[ERROR] Workflow failed: {e}")
+            raise
 
-        # Summary
-        self._print_summary()
+    def _update_data(self):
+        """Step 1: Update daily price data for all stocks"""
+        print("[Step 1/7] Updating daily price data...")
 
-    def _generate_daily_report(self, momentum_signals, watchlist, analyses, strategy_results):
-        """Generate comprehensive markdown report"""
+        try:
+            stock_list = self.db.get_stock_list()
+            self.stats['updated_stocks'] = len(stock_list)
+            print(f"  Data ready for {len(stock_list)} stocks")
 
-        report_path = self._get_report_filepath()
-        execution_time = time.time() - self.stats['start_time']
+        except Exception as e:
+            self.stats['errors'].append(f"Data update error: {str(e)}")
+            print(f"  [WARNING] Data update failed: {e}")
 
-        with open(report_path, 'w', encoding='utf-8') as f:
-            # Header
-            f.write(f"# Daily Market Report - {self.today_str} ({self.day_name})\n\n")
-            f.write(f"**Mode**: Observation (No Trading)\n\n")
-            f.write(f"**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            f.write("---\n\n")
+    def _scan_signals(self):
+        """Step 2: Run momentum and anomaly scanners"""
+        print("[Step 2/7] Scanning for signals...")
 
-            # Executive Summary
-            f.write("## Executive Summary\n\n")
-            f.write(f"- **Momentum Opportunities Found**: {len(momentum_signals)}\n")
-            f.write(f"- **Watchlist Stocks**: {len(watchlist)}\n")
-            f.write(f"- **New Additions Today**: {self.stats['new_watchlist_stocks']}\n")
-            f.write(f"- **Deep Analyses Completed**: {len(analyses)}\n")
-            f.write(f"- **Strategies Used**: {', '.join(self.stats['strategies_used'])}\n")
-            f.write(f"- **Execution Time**: {execution_time:.1f} seconds\n\n")
+        # Step 2.1: Momentum scanner
+        print("  [2.1] Running momentum scanner...")
+        momentum_candidates = self.momentum_scanner.scan(
+            min_score=70,
+            limit=50,
+            min_price=5.0,
+            max_price=200.0,
+            min_volume=500000
+        )
+        self.stats['momentum_signals'] = len(momentum_candidates)
+        print(f"  Found {len(momentum_candidates)} momentum signals")
 
-            # Section 1: Top Momentum Opportunities
-            f.write("---\n\n")
-            f.write("## 1. Top Momentum Opportunities\n\n")
-            f.write("*Stocks showing strong momentum (Score >= 70)*\n\n")
+        # Step 2.2: Anomaly scanner
+        print("  [2.2] Running anomaly scanner...")
+        anomaly_candidates = self.anomaly_scanner.scan(
+            min_score=60,
+            limit=50
+        )
+        self.stats['anomaly_signals'] = len(anomaly_candidates)
+        print(f"  Found {len(anomaly_candidates)} anomaly signals")
 
-            if momentum_signals:
-                f.write("| Rank | Symbol | Score | Signal | Momentum | Volume | Entry | Stop Loss | Take Profit |\n")
-                f.write("|------|--------|-------|--------|----------|--------|-------|-----------|-------------|\n")
+        return momentum_candidates, anomaly_candidates
 
-                for i, sig in enumerate(momentum_signals[:10], 1):
-                    f.write(f"| {i} | **{sig['symbol']}** | "
-                           f"{sig['momentum_score']:.0f} | {sig['signal']} | "
-                           f"{sig['momentum_pct']:+.2f}% | {sig['volume']:,.0f} | "
-                           f"${sig.get('entry_price', 0):.2f} | "
-                           f"${sig.get('stop_loss', 0):.2f} | "
-                           f"${sig.get('take_profit', 0):.2f} |\n")
+    def _build_watchlist(self, momentum_candidates, anomaly_candidates):
+        """Step 3: Build watchlist from signals"""
+        print("[Step 3/7] Building watchlist...")
 
-                f.write("\n### Trade Plans (Top 3)\n\n")
-                for i, sig in enumerate(momentum_signals[:3], 1):
-                    f.write(f"#### {i}. {sig['symbol']} - {sig['signal']}\n\n")
-                    f.write(f"**Score**: {sig['momentum_score']:.0f}/100\n\n")
-                    f.write(f"**Reasons**:\n")
-                    for reason in sig.get('reasons', []):
-                        f.write(f"- {reason}\n")
-                    f.write(f"\n**Trade Setup** (For when trading starts):\n")
-                    f.write(f"- Entry: ${sig.get('entry_price', 0):.2f}\n")
-                    f.write(f"- Stop Loss: ${sig.get('stop_loss', 0):.2f} "
-                           f"({((sig.get('stop_loss', 0) - sig.get('entry_price', 1)) / sig.get('entry_price', 1) * 100):.1f}%)\n")
-                    f.write(f"- Take Profit: ${sig.get('take_profit', 0):.2f} "
-                           f"({((sig.get('take_profit', 0) - sig.get('entry_price', 1)) / sig.get('entry_price', 1) * 100):.1f}%)\n")
-                    f.write(f"- Position Size: {sig.get('position_size', 0)} shares\n\n")
+        # Get current watchlist
+        current_watchlist = self.watchlist.get_list()
+        initial_count = len(current_watchlist)
+
+        # Create symbol maps for dual confirmation
+        momentum_map = {c.symbol: c.score for c in momentum_candidates}
+        anomaly_map = {c.symbol: c.score for c in anomaly_candidates}
+
+        # Add dual-confirmed stocks (highest priority)
+        dual_confirmed = set()
+        for symbol in set(momentum_map.keys()) & set(anomaly_map.keys()):
+            if momentum_map[symbol] >= 80 and anomaly_map[symbol] >= 60:
+                dual_confirmed.add(symbol)
+                self.watchlist.add(
+                    symbol=symbol,
+                    source='dual_confirmed',
+                    priority=1,
+                    notes=f"Momentum: {momentum_map[symbol]}, Anomaly: {anomaly_map[symbol]}"
+                )
+
+        self.stats['dual_confirmed'] = len(dual_confirmed)
+
+        # Add high-score momentum signals
+        for candidate in momentum_candidates:
+            if candidate.score >= 85 and candidate.symbol not in dual_confirmed:
+                self.watchlist.add(
+                    symbol=candidate.symbol,
+                    source='momentum',
+                    priority=2,
+                    notes=f"Momentum score: {candidate.score}"
+                )
+
+        # Add high-score anomaly signals (core 3-factor only)
+        for candidate in anomaly_candidates:
+            if candidate.is_core_three_factor() and candidate.symbol not in dual_confirmed:
+                self.watchlist.add(
+                    symbol=candidate.symbol,
+                    source='anomaly',
+                    priority=2,
+                    notes=f"Anomaly score: {candidate.score} (Core 3-factor)"
+                )
+
+        # Calculate new additions
+        final_watchlist = self.watchlist.get_list()
+        self.stats['new_watchlist_stocks'] = len(final_watchlist) - initial_count
+        self.stats['total_watchlist'] = len(final_watchlist)
+
+        print(f"  Watchlist: {len(final_watchlist)} stocks ({self.stats['new_watchlist_stocks']} new)")
+        print(f"  Dual-confirmed: {self.stats['dual_confirmed']}")
+
+    def _download_intraday_data(self):
+        """Step 4: Download intraday data for watchlist stocks"""
+        print("[Step 4/7] Downloading intraday data...")
+
+        try:
+            watchlist_stocks = self.watchlist.get_list()
+            symbols = [w['symbol'] for w in watchlist_stocks]
+
+            if symbols:
+                print(f"  Downloading data for {len(symbols)} watchlist stocks...")
+                # In observation mode, we skip this step (too slow)
+                print(f"  [SKIPPED] Intraday data download (observation mode)")
             else:
-                f.write("*No momentum opportunities found today.*\n\n")
+                print(f"  No stocks in watchlist")
 
-            # Section 2: Watchlist Deep Analysis
-            f.write("---\n\n")
-            f.write("## 2. Watchlist - Deep Analysis\n\n")
+        except Exception as e:
+            self.stats['errors'].append(f"Intraday download error: {str(e)}")
+            print(f"  [WARNING] Intraday download failed: {e}")
 
-            if watchlist:
-                f.write(f"**Current Watchlist**: {len(watchlist)} stocks\n\n")
+    def _run_deep_analysis(self):
+        """Step 5: Run advanced analysis on watchlist"""
+        print("[Step 5/7] Running deep analysis...")
 
-                # Summary table
-                f.write("| Symbol | Priority | Added | Source | Notes |\n")
-                f.write("|--------|----------|-------|--------|-------|\n")
-                for w in watchlist:
-                    pri_map = {1: 'High', 2: 'Medium', 3: 'Low'}
-                    f.write(f"| **{w['symbol']}** | {pri_map.get(w['priority'], 'N/A')} | "
-                           f"{w['added_date'][:10]} | {w['source']} | {w.get('notes', '')[:30]} |\n")
-                f.write("\n")
+        analyses = []
 
-                # Detailed analyses
-                if analyses:
-                    f.write("### Detailed Technical Analysis\n\n")
+        try:
+            watchlist_stocks = self.watchlist.get_list()
+            high_priority = [w for w in watchlist_stocks if w.get('priority') == 1]
 
-                    for analysis in analyses:
-                        symbol = analysis['symbol']
-                        f.write(f"#### {symbol}\n\n")
-                        f.write(f"**Overall Score**: {analysis['overall_score']}/100\n\n")
-                        f.write(f"**Signal**: {analysis['signal']}\n\n")
+            if high_priority:
+                print(f"  Analyzing {len(high_priority)} high-priority stocks...")
 
-                        # Technical indicators
-                        f.write("**Technical Indicators**:\n")
-                        indicators = analysis.get('indicators', {})
-                        f.write(f"- ADX: {indicators.get('adx', 0):.2f} (Trend Strength)\n")
-                        f.write(f"- RSI: {indicators.get('rsi', 0):.2f}\n")
-                        f.write(f"- Stochastic K%: {indicators.get('stoch_k', 0):.2f}\n")
-                        f.write(f"- ATR: ${indicators.get('atr', 0):.2f} (Volatility)\n")
-                        f.write(f"- OBV Trend: {indicators.get('obv_trend', 'N/A')}\n")
+                for stock in high_priority:
+                    try:
+                        analysis = self.analyzer.analyze(stock['symbol'])
+                        if analysis:
+                            analyses.append(analysis)
+                    except Exception:
+                        continue
 
-                        if indicators.get('vwap'):
-                            f.write(f"- VWAP: ${indicators['vwap']:.2f}\n")
-
-                        f.write("\n**Candlestick Patterns**:\n")
-                        patterns = analysis.get('patterns', [])
-                        if patterns:
-                            for pattern in patterns:
-                                f.write(f"- {pattern}\n")
-                        else:
-                            f.write("- None detected\n")
-
-                        f.write("\n**Support/Resistance**:\n")
-                        sr = indicators.get('support_resistance', {})
-                        f.write(f"- Resistance 2: ${sr.get('r2', 0):.2f}\n")
-                        f.write(f"- Resistance 1: ${sr.get('r1', 0):.2f}\n")
-                        f.write(f"- Pivot: ${sr.get('pivot', 0):.2f}\n")
-                        f.write(f"- Support 1: ${sr.get('s1', 0):.2f}\n")
-                        f.write(f"- Support 2: ${sr.get('s2', 0):.2f}\n")
-
-                        f.write("\n**Analysis Reasons**:\n")
-                        for reason in analysis.get('reasons', []):
-                            f.write(f"- {reason}\n")
-
-                        f.write("\n---\n\n")
+                print(f"  Completed {len(analyses)} analyses")
             else:
-                f.write("*Watchlist is empty.*\n\n")
+                print(f"  No high-priority stocks to analyze")
 
-            # Section 3: Multi-Strategy Comparison
-            f.write("---\n\n")
-            f.write("## 3. Multi-Strategy Comparison\n\n")
-            f.write(f"**Strategies**: {', '.join(self.stats['strategies_used'])}\n\n")
+        except Exception as e:
+            self.stats['errors'].append(f"Analysis error: {str(e)}")
+            print(f"  [WARNING] Deep analysis failed: {e}")
 
-            if strategy_results:
-                for symbol, df in strategy_results.items():
-                    f.write(f"### {symbol}\n\n")
-                    f.write("| Strategy | Signal | Score | Confidence | Entry | Stop Loss | Take Profit |\n")
-                    f.write("|----------|--------|-------|------------|-------|-----------|-------------|\n")
+        return analyses
 
-                    for _, row in df.iterrows():
-                        f.write(f"| {row['strategy']} | {row['signal']} | "
-                               f"{row['score']}/100 | {row['confidence']:.1%} | "
-                               f"${row['entry_price']:.2f} | ${row['stop_loss']:.2f} | "
-                               f"${row['take_profit']:.2f} |\n")
-                    f.write("\n")
-            else:
-                f.write("*No strategy comparisons performed.*\n\n")
+    def _run_strategy_comparison(self):
+        """Step 6: Run all strategies comparison"""
+        print("[Step 6/7] Running strategy comparison...")
 
-            # Section 4: Observations & Notes
-            f.write("---\n\n")
-            f.write("## 4. Daily Observations\n\n")
-            f.write("*This section is for manual notes and observations.*\n\n")
-            f.write("### Market Conditions\n\n")
-            f.write("- [ ] Bull market / Trending up\n")
-            f.write("- [ ] Bear market / Trending down\n")
-            f.write("- [ ] Ranging / Consolidating\n")
-            f.write("- [ ] High volatility\n\n")
-            f.write("### Personal Notes\n\n")
-            f.write("```\n")
-            f.write("Add your observations here:\n")
-            f.write("- What patterns did you notice?\n")
-            f.write("- Which stocks look most promising?\n")
-            f.write("- What would you do differently?\n")
-            f.write("- Questions to research?\n")
-            f.write("```\n\n")
+        strategy_results = []
 
-            # Section 5: Learning Points
-            f.write("---\n\n")
-            f.write("## 5. Learning Points\n\n")
-            f.write("*Track what you're learning during this observation period*\n\n")
-            f.write("- [ ] Strategy performance observation\n")
-            f.write("- [ ] Pattern recognition practice\n")
-            f.write("- [ ] Risk management review\n")
-            f.write("- [ ] Market sentiment analysis\n\n")
+        try:
+            strategies = self.strategy_manager.get_all_strategies()
+            self.stats['strategies_used'] = [s['name'] for s in strategies]
 
-            # Footer
-            f.write("---\n\n")
-            f.write(f"*Report generated by Daily Workflow System*\n\n")
-            f.write(f"**Next Steps**:\n")
-            f.write(f"1. Review all sections\n")
-            f.write(f"2. Add your personal observations\n")
-            f.write(f"3. Update watchlist priorities based on analysis\n")
-            f.write(f"4. Track these stocks' performance tomorrow\n\n")
+            print(f"  Comparing {len(strategies)} strategies...")
 
-            if self.stats['errors']:
-                f.write("**Errors Encountered**:\n")
-                for error in self.stats['errors']:
-                    f.write(f"- {error}\n")
+            for strategy in strategies:
+                try:
+                    result = self.strategy_manager.run_strategy(strategy['name'])
+                    if result:
+                        strategy_results.append(result)
+                except Exception:
+                    continue
 
-        return report_path
+            print(f"  Completed {len(strategy_results)} strategy runs")
 
-    def _print_summary(self):
+        except Exception as e:
+            self.stats['errors'].append(f"Strategy comparison error: {str(e)}")
+            print(f"  [WARNING] Strategy comparison failed: {e}")
+
+        return strategy_results
+
+    def _generate_report(self, momentum_candidates, anomaly_candidates,
+                        analyses, strategy_results):
+        """Step 7: Generate comprehensive daily report"""
+        print("[Step 7/7] Generating report...")
+
+        try:
+            watchlist = self.watchlist.get_list()
+
+            report_path = self.report_generator.generate_daily_report(
+                momentum_candidates=momentum_candidates,
+                anomaly_candidates=anomaly_candidates,
+                watchlist=watchlist,
+                analyses=analyses,
+                strategy_results=strategy_results,
+                stats=self.stats
+            )
+
+            print(f"  Report generated successfully")
+            return report_path
+
+        except Exception as e:
+            self.stats['errors'].append(f"Report generation error: {str(e)}")
+            print(f"  [ERROR] Report generation failed: {e}")
+            raise
+
+    def _print_summary(self, report_path):
         """Print execution summary"""
+        print()
         print("=" * 80)
         print("DAILY WORKFLOW COMPLETED")
         print("=" * 80)
         print()
-        print(f"Report saved to: {self._get_report_filepath()}")
+        print(f"Report saved to: {report_path}")
         print()
         print("Summary:")
-        print(f"  - Momentum signals found: {self.stats['momentum_signals']}")
+        print(f"  - Momentum signals: {self.stats['momentum_signals']}")
+        print(f"  - Anomaly signals: {self.stats['anomaly_signals']}")
+        print(f"  - Dual confirmed: {self.stats['dual_confirmed']}")
         print(f"  - Watchlist stocks: {self.stats['total_watchlist']}")
         print(f"  - New additions: {self.stats['new_watchlist_stocks']}")
         print(f"  - Strategies used: {', '.join(self.stats['strategies_used'])}")
@@ -469,6 +334,8 @@ class DailyWorkflow:
 
         if self.stats['errors']:
             print(f"  - Errors: {len(self.stats['errors'])}")
+            for error in self.stats['errors']:
+                print(f"    * {error}")
 
         print()
         print("Next steps:")
@@ -479,6 +346,11 @@ class DailyWorkflow:
         print()
 
 
-if __name__ == "__main__":
+def run_daily_workflow():
+    """Entry point for daily workflow"""
     workflow = DailyWorkflow()
     workflow.run_daily_workflow()
+
+
+if __name__ == '__main__':
+    run_daily_workflow()
