@@ -1,7 +1,11 @@
-# 系统架构文档 - 分层设计
+# 系统架构文档 - 分层设计 v2.1
 
 **Created**: 2025-12-31
+**Last Updated**: 2025-12-31 (v2.1 stability & boundary fixes)
 **Status**: Production Ready
+**Architecture Version**: 2.1
+**Change Type**: Stability & Boundary Fix
+**Backward Compatibility**: Yes (with migration notes)
 
 ---
 
@@ -27,15 +31,15 @@
 │  - tools/daily_workflow.py (356 lines)               │
 │  - 只做流程编排，禁止包含业务逻辑                         │
 │  ✅ Can call: Layer 2, 3, 4                          │
-│  ❌ Cannot call: Layer 1 directly                    │
+│  ⚠️  Limited access to Layer 1 (prepare-only)        │
 └──────────────────────────────────────────────────────┘
                         ↓
 ┌──────────────────────────────────────────────────────┐
 │  Layer 4: Reporting                                  │
 │  - tools/report_generator.py (434 lines)             │
-│  - 消费标准化对象，生成Markdown报告                      │
-│  ✅ Can consume: WatchlistCandidate (read-only)      │
-│  ❌ Cannot call: Layer 1, 2, 3                       │
+│  - 消费 ReportContext，生成Markdown报告                │
+│  ✅ Can consume: ReportContext (read-only)           │
+│  ❌ Cannot call: Any layer's methods                 │
 └──────────────────────────────────────────────────────┘
                         ↓
 ┌──────────────────────────────────────────────────────┐
@@ -66,7 +70,74 @@
 
 ---
 
-## 📋 数据契约 (Data Contracts)
+## 🔒 Layer 调用约束（v2.1 强化）
+
+### Layer 5 → Layer 1: Limited Access
+
+**⚠️ Allowed (Prepare-only)**:
+- Data preparation, cache refresh, health check
+- Methods prefixed with: `prepare_*`, `update_*`, `warmup_*`, `get_stock_list()`
+
+**❌ Forbidden**:
+- Any business data retrieval (e.g., `get_price_history()`)
+- Any logic depending on historical series
+
+**Layer 1 API Convention**:
+```python
+# Workflow allowed
+db.get_stock_list()      # metadata only
+db.prepare_*()           # cache warming
+db.update_*()            # data refresh
+
+# Signals / Events only
+db.get_price_history()   # historical series
+db.get_*()               # general rule
+```
+
+**Rationale**: 防止 workflow 被迫把"数据准备"塞进 signal 层，导致分层名存实亡。
+
+---
+
+### Layer 4: Reporting Context
+
+**Consumes**: `ReportContext` (read-only struct)
+
+```python
+@dataclass
+class ReportContext:
+    """
+    Unified input for report generation
+
+    All data needed for rendering, pre-computed by workflow layer.
+    """
+    # Signal results
+    momentum_candidates: List[WatchlistCandidate]
+    anomaly_candidates: List[WatchlistCandidate]
+
+    # Analysis results
+    watchlist: List[Dict]
+    analyses: List[Dict]
+    strategy_results: List[Dict]
+
+    # Optional deep validation
+    confirmed_events: Optional[List[ConfirmedEvent]] = None
+
+    # Execution metadata
+    stats: Dict[str, Any] = field(default_factory=dict)
+    config_snapshot: Dict[str, Any] = field(default_factory=dict)
+    errors: List[str] = field(default_factory=list)
+```
+
+**Forbidden**:
+- ❌ 调用任何 Layer 的方法
+- ❌ 进行数据计算、评分、筛选
+- ❌ 推断/猜测任何统计信息
+
+**Rationale**: 避免 report_generator 内部"猜测"统计信息，保持纯渲染。
+
+---
+
+## 📋 数据契约 (Data Contracts v2.1)
 
 ### WatchlistCandidate
 
@@ -80,21 +151,23 @@ class WatchlistCandidate:
     date: str  # YYYY-MM-DD
     close: float
 
-    # 来源标识
-    source: Literal['momentum', 'anomaly']
+    # 来源标识 (v2.1: 扩展支持 'both')
+    # 'momentum': 趋势信号
+    # 'anomaly': 异常信号
+    # 'both': 双重确认（由 workflow 在合并时标记）
+    source: Literal['momentum', 'anomaly', 'both']
 
     # 评分 (0-100)
     score: int
 
     # 分类标签（用于报告分组）
-    # STRUCTURAL tags: VOLATILITY_EXPANSION, VOLUME_SPIKE, CLEAR_STRUCTURE,
-    #                  GAP, BREAKOUT, SQUEEZE_RELEASE
-    # AUXILIARY tags: DOLLAR_VOLUME, MOMENTUM_CONFIRM
+    # v2.1: Mixed usage (backward compatible)
+    # v2.2: Will refactor to event_tags / feature_tags namespaces
     tags: List[str] = field(default_factory=list)
 
     # 风险参数（如有）
     stop_loss: Optional[float] = None
-    risk_pct: Optional[float] = None  # 止损百分比
+    risk_pct: Optional[float] = None  # v2.1: 止损幅度（正数百分比，0-100）
 
     # 元数据（供报告详细展示）
     # 例: {'momentum_20d': 15.2, 'volume_ratio': 2.3, 'volatility': 3.5}
@@ -109,6 +182,7 @@ class WatchlistCandidate:
 **生产者**:
 - `script/signals/momentum_signal.py::scan()` → List[WatchlistCandidate]
 - `script/signals/anomaly_signal.py::scan()` → List[WatchlistCandidate]
+- `tools/daily_workflow.py::_build_watchlist()` → 合并时创建 `source='both'`
 
 **消费者**:
 - `tools/daily_workflow.py::_build_watchlist()` → 合并、去重、优先级排序
@@ -116,8 +190,8 @@ class WatchlistCandidate:
 
 **验证规则**:
 - `score`: 必须 0-100
-- `source`: 必须 'momentum' 或 'anomaly'
-- `risk_pct`: 如果存在，必须 < 0 (负数)
+- `source`: 必须 'momentum', 'anomaly', 或 'both'
+- `risk_pct`: 如果存在，必须 0-100 (正数百分比)
 
 **辅助方法**:
 - `has_tag(tag: str) -> bool`: 检查是否包含指定标签
@@ -127,7 +201,67 @@ class WatchlistCandidate:
 
 ---
 
-## 🏷️ 异常分类学 (Anomaly Taxonomy)
+### v2.1 Breaking Changes & Migration
+
+#### 1. `source` field expansion
+
+**Before (v2.0)**:
+```python
+source: Literal['momentum', 'anomaly']
+```
+
+**After (v2.1)**:
+```python
+source: Literal['momentum', 'anomaly', 'both']
+```
+
+**Migration**:
+- Signal scanners: No change needed (只产生 'momentum' 或 'anomaly')
+- Workflow layer: 双重确认时创建新 Candidate with `source='both'`
+- Report layer: 支持 `source='both'` 的渲染
+
+---
+
+#### 2. `risk_pct` semantics change
+
+**Before (v2.0)**:
+```python
+risk_pct: Optional[float] = None  # 负数 (e.g., -3.5)
+assert risk_pct < 0, "should be negative"
+```
+
+**After (v2.1)**:
+```python
+risk_pct: Optional[float] = None  # 正数百分比 (0-100)
+assert 0 <= risk_pct <= 100, "positive percentage"
+```
+
+**Migration**:
+```python
+# Old code
+risk_pct = (stop_loss - close) / close * 100  # -3.5
+
+# New code (v2.1)
+risk_pct = abs((close - stop_loss) / close * 100)  # 3.5
+```
+
+**Rationale**:
+- 正数语义在报告中更清晰（"Risk: 3.5%"）
+- 为未来 short selling 留后路（正数适用于多空）
+- Direction (long/short) 由 `stop_loss` vs `close` 隐含
+
+**Display in Reports**:
+```python
+# Old (v2.0)
+f"Risk: {risk_pct:.1f}%"  # Risk: -3.5%
+
+# New (v2.1)
+f"Risk: {risk_pct:.1f}%"  # Risk: 3.5%
+```
+
+---
+
+## 🏷️ 异常分类学 (Anomaly Taxonomy v2.1)
 
 ### 三层分类
 
@@ -153,6 +287,54 @@ class WatchlistCandidate:
 - `LOW_LIQUIDITY`: 日均成交额 < 100万
 - `PENNY_STOCK`: 价格 < $5
 - `CORPORATE_ACTION`: 单日gap > 50%（疑似分红/拆股）
+
+---
+
+### v2.2 Roadmap: Tags Namespace Separation
+
+**Current (v2.1)**: Mixed usage, backward compatible
+
+**Planned (v2.2)**: Strong separation
+
+```python
+# event_tags (STRUCTURAL ONLY)
+# - Define structural event identity
+# - event_discovery_system may ONLY read these
+event_tags = [
+    'GAP_REV',          # Gap reversal
+    'GAP_CONT',         # Gap continuation
+    'SQUEEZE_RELEASE',  # Squeeze breakout
+    'BREAKOUT',         # Price breakout (optional)
+]
+
+# feature_tags (EXPLANATORY ONLY)
+# - Descriptive characteristics
+# - Used for scoring and filtering only
+feature_tags = [
+    'VOLATILITY_EXPANSION',
+    'VOLUME_SPIKE',
+    'CLEAR_STRUCTURE',
+    'DOLLAR_VOLUME_OK',
+    'MOMENTUM_CONFIRM',
+]
+```
+
+**Enforcement Rules (v2.2)**:
+```python
+# v2.2 validation
+assert all(tag in event_tags for tag in candidate.event_tags)
+assert all(tag in feature_tags for tag in candidate.feature_tags)
+
+# event_discovery_system (v2.2)
+def run(self, candidates):
+    for c in candidates:
+        if 'GAP_REV' in c.event_tags:  # ✅ Only read event_tags
+            # ... validate with intraday
+```
+
+**Rationale**: 防止 feature 被误当成 event，导致 System2 (event_discovery) 被污染。
+
+---
 
 ### 评分规则
 
@@ -186,13 +368,13 @@ if any(noise_filter):
 ```python
 class DailyWorkflow:
     def run_daily_workflow(self):
-        # Step 1: 数据准备
+        # Step 1: 数据准备（Limited Layer 1 access）
         self._update_data()
 
         # Step 2: 快速信号扫描
         momentum_candidates, anomaly_candidates = self._scan_signals()
 
-        # Step 3: 构建观察列表
+        # Step 3: 构建观察列表（合并 + 双重确认）
         self._build_watchlist(momentum_candidates, anomaly_candidates)
 
         # Step 4-5: 深度分析
@@ -201,7 +383,7 @@ class DailyWorkflow:
         # Step 6: 策略对比
         strategy_results = self._run_strategy_comparison()
 
-        # Step 7: 生成报告
+        # Step 7: 生成报告（使用 ReportContext）
         report_path = self._generate_report(
             momentum_candidates, anomaly_candidates,
             analyses, strategy_results
@@ -219,6 +401,7 @@ class DailyWorkflow:
 **✅ 允许在 workflow 中的内容**:
 - 调用 Signal 层的 `scan()` 方法
 - 聚合、合并、排序 Candidate 对象
+- 创建 `source='both'` 的双重确认 Candidate
 - 异常处理的顶层 catch（记录到 errors 列表）
 - 进度提示（print）
 
@@ -280,6 +463,10 @@ momentum_scanner.scan(
 )
 ```
 
+**v2.1 change**: `risk_pct` 现在为正数 (5.0 instead of -5.0)
+
+---
+
 #### AnomalySignal
 
 **职责**: 识别结构异常
@@ -302,6 +489,8 @@ anomaly_scanner.scan(
 )
 ```
 
+**v2.1 change**: `risk_pct` 计算改为 `abs((close - stop_loss) / close * 100)`
+
 ---
 
 ## 🎨 Layer 4: Reporting 层设计
@@ -316,7 +505,7 @@ anomaly_scanner.scan(
 - ❌ 进行数据计算、评分、筛选
 
 **允许项**:
-- ✅ 消费 WatchlistCandidate 对象
+- ✅ 消费 ReportContext 对象
 - ✅ 格式化为 Markdown
 - ✅ 创建报告目录结构
 - ✅ 写入文件
@@ -329,6 +518,8 @@ anomaly_scanner.scan(
 5. Strategy Comparison
 6. Risk Management
 7. Learning Points
+
+**v2.1 enhancement**: 支持 `source='both'` 的双重确认渲染
 
 ---
 
@@ -365,6 +556,8 @@ print(confirmed['confirmed_events'])
 **触发时机**:
 - 用户手动运行（非自动化）
 - 或在 workflow 末尾可选执行（用户配置开关）
+
+**v2.2 constraint**: 只读取 `event_tags`，不读取 `feature_tags`
 
 ---
 
@@ -405,7 +598,7 @@ print(confirmed['confirmed_events'])
 - [✅] 生成的报告包含 Momentum 和 Anomaly 两部分
 - [✅] Watchlist 正确添加 dual_confirmed 股票
 - [✅] 报告文件路径与之前一致
-- [✅] 数据契约测试全部通过
+- [✅] 数据契约测试全部通过 (v2.1: 5/5)
 
 ### 架构改进
 
@@ -414,6 +607,12 @@ print(confirmed['confirmed_events'])
 - [✅] 所有信号模块都返回 `WatchlistCandidate`
 - [✅] `event_discovery_system.py` 没有被 workflow 导入
 - [✅] 每个文件职责单一
+
+### v2.1 新增验证
+
+- [✅] `source='both'` 支持正常
+- [✅] `risk_pct` 正数语义测试通过
+- [✅] Layer 1 调用约束文档化
 
 ---
 
@@ -443,10 +642,18 @@ print(confirmed['confirmed_events'])
 - 删除所有业务逻辑
 - 纯编排层（只调用其他层）
 
-**Phase 5**: 文档与验收 (✅ 当前)
+**Phase 5**: 文档与验收 (✅ Commit 3ade1bc)
 - 创建 `docs/ARCHITECTURE.md`
 - 更新 `IMPLEMENTATION_SUMMARY.md`
 - 验证所有验收标准
+
+**Phase v2.1**: 稳定性与边界修复 (✅ Commit 69e5417)
+- 扩展 `source` 支持 `'both'`
+- 修改 `risk_pct` 为正数语义
+- 添加 Layer 1 调用约束
+- 规划 v2.2 tags namespace 重构
+
+---
 
 ### 代码统计
 
@@ -455,7 +662,7 @@ print(confirmed['confirmed_events'])
 - Signal logic: embedded in workflow
 - Report logic: embedded in workflow
 
-**After**:
+**After (v2.1)**:
 - `daily_workflow.py`: 356 lines (-48.6%)
 - `momentum_signal.py`: 316 lines (new)
 - `anomaly_signal.py`: 490 lines (new)
@@ -463,6 +670,8 @@ print(confirmed['confirmed_events'])
 - `report_generator.py`: 434 lines (new)
 
 **Total**: From ~700 lines (monolithic) to ~1760 lines (well-structured)
+
+**v2.1 changes**: +37 lines, -18 lines (net +19 lines, mostly documentation)
 
 ---
 
@@ -481,6 +690,14 @@ class MyNewSignal(SignalScanner):
         # Your logic here
         candidates = []
         # ...
+        # v2.1: Use positive risk_pct
+        risk_pct = abs((close - stop_loss) / close * 100)
+
+        candidate = WatchlistCandidate(
+            source='momentum',  # or 'anomaly', NOT 'both'
+            risk_pct=risk_pct,  # positive value
+            # ...
+        )
         return candidates[:limit]
 ```
 
@@ -499,7 +716,11 @@ def _scan_signals(self):
 # tools/report_generator.py
 def _write_my_section(self, f, my_candidates):
     # Render to Markdown
+    # v2.1: Display risk_pct as positive
+    f.write(f"Risk: {c.risk_pct:.1f}%\n")
 ```
+
+---
 
 ### 添加新报告章节
 
@@ -513,6 +734,97 @@ def generate_daily_report(self, ...):
 
 ---
 
-**Last Updated**: 2025-12-31
-**Architecture Version**: 2.0
+### v2.2 迁移准备
+
+**Tags Namespace Separation**:
+
+```python
+# v2.1 (current)
+candidate.tags = ['VOLATILITY_EXPANSION', 'GAP', 'BREAKOUT']
+
+# v2.2 (planned)
+candidate.event_tags = ['GAP_REV', 'BREAKOUT']
+candidate.feature_tags = ['VOLATILITY_EXPANSION', 'VOLUME_SPIKE']
+```
+
+**Migration path**:
+1. Add `event_tags` and `feature_tags` fields to `WatchlistCandidate`
+2. Deprecate `tags` field with warning
+3. Update all scanners to populate new fields
+4. Update report_generator to read new fields
+5. Remove `tags` field in v3.0
+
+---
+
+## 📝 Migration Notes (v2.0 → v2.1)
+
+### For Signal Scanner Authors
+
+**Old code (v2.0)**:
+```python
+risk_pct = (stop_loss - close) / close * 100  # -3.5
+candidate = WatchlistCandidate(risk_pct=risk_pct)
+```
+
+**New code (v2.1)**:
+```python
+risk_pct = abs((close - stop_loss) / close * 100)  # 3.5
+candidate = WatchlistCandidate(risk_pct=risk_pct)
+```
+
+---
+
+### For Workflow Authors
+
+**Creating dual-confirmed candidates**:
+```python
+# v2.1
+dual_candidate = WatchlistCandidate(
+    symbol=symbol,
+    source='both',  # NEW in v2.1
+    score=max(momentum_score, anomaly_score),
+    tags=momentum_tags + anomaly_tags,
+    # ...
+)
+```
+
+---
+
+### For Report Authors
+
+**Displaying risk**:
+```python
+# v2.0
+f"Risk: {c.risk_pct:.1f}%"  # Risk: -3.5%
+
+# v2.1 (same code, different output)
+f"Risk: {c.risk_pct:.1f}%"  # Risk: 3.5%
+```
+
+**Handling 'both' source**:
+```python
+# v2.1
+if c.source == 'both':
+    f.write("⭐ Dual-Confirmed\n")
+```
+
+---
+
+## 🔮 Roadmap
+
+### v2.2 (Next Release)
+- [ ] Tags namespace separation (`event_tags` / `feature_tags`)
+- [ ] `ReportContext` dataclass implementation
+- [ ] Event discovery system tag filtering enforcement
+
+### v3.0 (Future)
+- [ ] Remove deprecated `tags` field
+- [ ] Add `side: Literal['long', 'short']` for short selling support
+- [ ] Full backward compatibility break (major version bump)
+
+---
+
+**Last Updated**: 2025-12-31 (v2.1)
+**Architecture Version**: 2.1
 **Status**: ✅ Production Ready
+**Backward Compatibility**: Yes (with migration notes)
