@@ -32,13 +32,14 @@ class WatchlistManager:
 
     # ============ 手动管理 (Manual Management) ============
 
-    def add(self, symbol, priority=2, notes='', target_price=None, stop_loss=None):
+    def add(self, symbol, priority=2, source='manual', notes='', target_price=None, stop_loss=None):
         """
         添加股票到观察列表
 
         Args:
             symbol: 股票代码
             priority: 优先级 (1=高, 2=中, 3=低)
+            source: 来源 ('manual', 'momentum', 'anomaly', 'dual_confirmed') - v2.1+
             notes: 备注
             target_price: 目标价
             stop_loss: 止损价
@@ -49,7 +50,7 @@ class WatchlistManager:
         return self.db.add_to_watchlist(
             symbol=symbol,
             priority=priority,
-            source='manual',
+            source=source,
             notes=notes,
             target_price=target_price,
             stop_loss=stop_loss

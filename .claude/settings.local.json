@@ -11,7 +11,15 @@
       "Bash(ls -la \"d:\\\\strategy=Z\\\\tools\"\" 2>/dev/null || echo \"tools folder not found \")",
       "Bash(ls -la \"d:\\\\strategy=Z\\\\db\"\" 2>/dev/null || echo \"db folder not found \")",
       "Bash(sqlite3:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: Complete stock analysis system with observation mode\n\nFeatures:\n- Database with 2,156 NASDAQ stocks \\(1.5GB\\)\n- Daily + intraday \\(5-minute\\) price data\n- 16 database tables with 38 indexes\n- Strategy framework \\(3 built-in strategies + custom template\\)\n- Daily observation workflow for pre-trading practice\n- Automated report generation by year/month/week\n- Watchlist management with auto-recommendations\n- Advanced technical analysis \\(20+ indicators\\)\n- Multi-strategy comparison system\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(timeout 30 python:*)",
+      "Bash(ls -lh \"d:\\\\strategy=Z\\\\DATA\\\\labels\"\" 2>&1 || echo \"Label directory not found \")",
+      "Bash(find:*)"
     ]
   }
 }

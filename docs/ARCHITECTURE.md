@@ -616,65 +616,6 @@ print(confirmed['confirmed_events'])
 
 ---
 
-## 🎯 实施总结
-
-### 完成的Phase
-
-**Phase 1**: 数据契约 (✅ Commit 89ff280)
-- 创建 `script/signals/base.py`
-- 定义 `WatchlistCandidate` 和 `SignalScanner`
-- 定义 `AnomalyTags` 常量
-- 通过完整测试套件
-
-**Phase 2**: Signal 层重构 (✅ Commit f550999, 74f18f9)
-- 重构 `momentum_signal.py` (316 lines)
-- 重构 `anomaly_signal.py` (490 lines)
-- 保留向后兼容 wrapper
-- 统一返回 `List[WatchlistCandidate]`
-
-**Phase 3**: Reporting 层抽取 (✅ Commit 4b2cdd3)
-- 创建 `tools/report_generator.py` (434 lines)
-- 抽取所有 Markdown 渲染逻辑
-- 纯 Layer 4 组件（无业务逻辑）
-
-**Phase 4**: Workflow 简化 (✅ Commit 18947ea)
-- 重构 `daily_workflow.py` (693 → 356 lines)
-- 删除所有业务逻辑
-- 纯编排层（只调用其他层）
-
-**Phase 5**: 文档与验收 (✅ Commit 3ade1bc)
-- 创建 `docs/ARCHITECTURE.md`
-- 更新 `IMPLEMENTATION_SUMMARY.md`
-- 验证所有验收标准
-
-**Phase v2.1**: 稳定性与边界修复 (✅ Commit 69e5417)
-- 扩展 `source` 支持 `'both'`
-- 修改 `risk_pct` 为正数语义
-- 添加 Layer 1 调用约束
-- 规划 v2.2 tags namespace 重构
-
----
-
-### 代码统计
-
-**Before**:
-- `daily_workflow.py`: 693 lines
-- Signal logic: embedded in workflow
-- Report logic: embedded in workflow
-
-**After (v2.1)**:
-- `daily_workflow.py`: 356 lines (-48.6%)
-- `momentum_signal.py`: 316 lines (new)
-- `anomaly_signal.py`: 490 lines (new)
-- `base.py`: 165 lines (new)
-- `report_generator.py`: 434 lines (new)
-
-**Total**: From ~700 lines (monolithic) to ~1760 lines (well-structured)
-
-**v2.1 changes**: +37 lines, -18 lines (net +19 lines, mostly documentation)
-
----
-
 ## 🚀 扩展指南
 
 ### 添加新信号类型
@@ -756,7 +697,59 @@ candidate.feature_tags = ['VOLATILITY_EXPANSION', 'VOLUME_SPIKE']
 
 ---
 
-## 📝 Migration Notes (v2.0 → v2.1)
+## 📝 Migration Notes
+
+### v2.1.1 → Current
+
+**Contract Separation** (必改 2):
+- Data contracts moved from `script/signals/base.py` to `script/contracts.py`
+- Prevents business logic coupling with data structures
+- `base.py` now only contains `SignalScanner` ABC (55 lines)
+
+**Old imports**:
+```python
+from script.signals.base import WatchlistCandidate, AnomalyTags
+```
+
+**New imports** (both work via re-export):
+```python
+# Direct (recommended for clarity)
+from script.contracts import WatchlistCandidate, AnomalyTags
+
+# Via signals package (still works)
+from script.signals import WatchlistCandidate, AnomalyTags
+```
+
+**Taxonomy Semantic Separation** (必改 1):
+- Added `get_event_tags()` and `get_feature_tags()` to `AnomalyTags`
+- **Event tags** (STRUCTURAL EVENTS): Define what happened (GAP, BREAKOUT, SQUEEZE_RELEASE)
+  - Read by `event_discovery_system` for deep validation
+- **Feature tags** (STRUCTURAL FEATURES): Describe characteristics (VOLATILITY_EXPANSION, VOLUME_SPIKE, CLEAR_STRUCTURE)
+  - Used for scoring and filtering only
+
+**Migration path**:
+```python
+# Old (v2.1, still works)
+all_tags = AnomalyTags.get_structural_tags()
+
+# New (v2.1.1, semantic clarity)
+event_tags = AnomalyTags.get_event_tags()      # For event discovery
+feature_tags = AnomalyTags.get_feature_tags()  # For scoring
+```
+
+**File structure changes**:
+```
+script/
+├── contracts.py          # NEW: WatchlistCandidate, AnomalyTags (168 lines)
+└── signals/
+    ├── base.py          # REDUCED: Only SignalScanner ABC (55 lines, was 165)
+    ├── momentum_signal.py
+    └── anomaly_signal.py
+```
+
+---
+
+### v2.0 → v2.1
 
 ### For Signal Scanner Authors
 
@@ -813,18 +806,23 @@ if c.source == 'both':
 ## 🔮 Roadmap
 
 ### v2.2 (Next Release)
-- [ ] Tags namespace separation (`event_tags` / `feature_tags`)
+- [ ] Full tags namespace separation (`event_tags` / `feature_tags` as separate fields)
 - [ ] `ReportContext` dataclass implementation
 - [ ] Event discovery system tag filtering enforcement
 
 ### v3.0 (Future)
-- [ ] Remove deprecated `tags` field
+- [ ] Remove deprecated `tags` field (replaced by `event_tags` + `feature_tags`)
 - [ ] Add `side: Literal['long', 'short']` for short selling support
 - [ ] Full backward compatibility break (major version bump)
 
 ---
 
-**Last Updated**: 2025-12-31 (v2.1)
-**Architecture Version**: 2.1
+**Last Updated**: 2025-12-31 (v2.1.1)
+**Architecture Version**: 2.1.1
 **Status**: ✅ Production Ready
 **Backward Compatibility**: Yes (with migration notes)
+
+**v2.1.1 Changes**:
+- ✅ Contracts separated to `script/contracts.py`
+- ✅ Taxonomy semantic separation (`get_event_tags()` / `get_feature_tags()`)
+- ✅ Implementation summary removed from architecture doc

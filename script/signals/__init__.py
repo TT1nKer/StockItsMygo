@@ -7,8 +7,11 @@ All signal scanners must return List[WatchlistCandidate].
 Available signals:
 - momentum_signal: Trend-based momentum scanner
 - anomaly_signal: Structure-based anomaly detector
+
+Version: v2.1.1
 """
 
-from script.signals.base import WatchlistCandidate, SignalScanner
+# Re-export from base (which imports from contracts)
+from script.signals.base import SignalScanner, WatchlistCandidate, AnomalyTags
 
-__all__ = ['WatchlistCandidate', 'SignalScanner']
+__all__ = ['SignalScanner', 'WatchlistCandidate', 'AnomalyTags']

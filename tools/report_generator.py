@@ -341,16 +341,20 @@ class ReportGenerator:
         f.write("---\n\n")
         f.write("## 3. Watchlist - Deep Analysis\n\n")
 
-        if watchlist:
+        if len(watchlist) > 0:
             f.write(f"**Current Watchlist**: {len(watchlist)} stocks\n\n")
 
             # Summary table
             f.write("| Symbol | Priority | Added | Source | Notes |\n")
             f.write("|--------|----------|-------|--------|-------|\n")
-            for w in watchlist:
+            for _, w in watchlist.iterrows():
                 pri_map = {1: 'High', 2: 'Medium', 3: 'Low'}
-                f.write(f"| **{w['symbol']}** | {pri_map.get(w.get('priority', 3), 'N/A')} | "
-                       f"{w.get('added_date', '')[:10]} | {w.get('source', 'N/A')} | {w.get('notes', '')[:30]} |\n")
+                priority = w.get('priority', 3)
+                added_date = str(w.get('added_date', ''))[:10]
+                source = w.get('source', 'N/A')
+                notes = str(w.get('notes', ''))[:30]
+                f.write(f"| **{w['symbol']}** | {pri_map.get(priority, 'N/A')} | "
+                       f"{added_date} | {source} | {notes} |\n")
             f.write("\n")
 
             # Detailed analyses
