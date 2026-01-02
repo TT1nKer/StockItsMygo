@@ -4,7 +4,8 @@ Test analyst ratings, price targets, institutional holders, and insider transact
 """
 
 import sys
-sys.path.append('d:/strategy=Z')
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.init_db import init_database
 from db.api import StockDB

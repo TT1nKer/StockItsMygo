@@ -86,7 +86,7 @@ def retry_failed_downloads():
 
     # Final database stats
     import os
-    db_size = os.path.getsize('d:/strategy=Z/db/stock.db') / (1024 * 1024)
+    db_size = os.path.getsize('<dynamically determined path>') / (1024 * 1024)
     print(f"Final database size: {db_size:.1f} MB")
     print()
 

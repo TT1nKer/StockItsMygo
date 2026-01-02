@@ -3,7 +3,7 @@ import sqlite3
 from db.api import StockDB
 
 # Check tables
-conn = sqlite3.connect('d:/strategy=Z/db/stock.db')
+conn = sqlite3.connect('<dynamically determined path>')
 cursor = conn.cursor()
 
 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")

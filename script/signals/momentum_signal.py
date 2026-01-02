@@ -8,7 +8,8 @@ Philosophy: Identifies trending opportunities, not predictions.
 """
 
 import sys
-sys.path.insert(0, 'd:/strategy=Z')
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from script.signals.base import SignalScanner, WatchlistCandidate, AnomalyTags
 from db.api import StockDB

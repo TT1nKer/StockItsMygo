@@ -7,13 +7,16 @@ import sqlite3
 import os
 
 
-def init_database(db_path='d:/strategy=Z/db/stock.db'):
+def init_database(db_path=None):
     """
     初始化数据库 - 核心表
 
     Args:
-        db_path: 数据库文件路径
+        db_path: 数据库文件路径（默认使用config/paths.py中的路径）
     """
+    if db_path is None:
+        from config.paths import paths
+        db_path = paths.db_path
     # 确保目录存在
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 

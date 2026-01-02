@@ -5,8 +5,9 @@ Check Database Data Summary
 
 import sqlite3
 from datetime import datetime
+from config.paths import paths
 
-db_path = 'd:/strategy=Z/db/stock.db'
+db_path = paths.db_path
 
 print("=" * 80)
 print("DATABASE DATA SUMMARY")

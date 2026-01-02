@@ -42,7 +42,8 @@ class DailyUpdater:
         self.analyzer = AdvancedAnalyzer()
 
         # 创建报告目录
-        self.reports_dir = 'd:/strategy=Z/docs/reports'
+        from config.paths import paths
+        self.reports_dir = paths.reports_dir
         os.makedirs(self.reports_dir, exist_ok=True)
 
     def run_daily_update(self):

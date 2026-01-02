@@ -19,7 +19,8 @@ Reports saved to: reports/YYYY/MM-Month/Week_XX/YYYY-MM-DD_DayName.md
 """
 
 import sys
-sys.path.insert(0, 'd:/strategy=Z')
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tools.daily_workflow import DailyWorkflow
 from datetime import datetime

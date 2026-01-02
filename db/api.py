@@ -14,16 +14,18 @@ import json
 class StockDB:
     """股票数据库 API"""
 
-    def __init__(self, db_path='d:/strategy=Z/db/stock.db'):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            from config.paths import paths
+            db_path = paths.db_path
         self.db_path = db_path
 
     # ============ Level 1: 基础操作 ============
 
     def _connect(self):
         """获取数据库连接"""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('PRAGMA foreign_keys = ON')
-        return conn
+        from db.connection import db_connection
+        return db_connection.connect()
 
     def _execute_batch(self, sql, data, batch_size=1000):
         """
@@ -38,7 +40,12 @@ class StockDB:
         cursor = conn.cursor()
 
         try:
-            conn.execute('BEGIN TRANSACTION')
+            from config.database import config
+            # PostgreSQL uses cursor for transactions, SQLite uses conn
+            if config.DB_TYPE == 'postgresql':
+                cursor.execute('BEGIN')
+            else:
+                conn.execute('BEGIN TRANSACTION')
 
             for i in range(0, len(data), batch_size):
                 batch = data[i:i+batch_size]
@@ -108,14 +115,14 @@ class StockDB:
             ))
 
         # 批量插入
-        sql = '''
-            INSERT OR REPLACE INTO stocks (
-                symbol, company_name, security_name, market_category, exchange,
-                sector, industry, country, is_etf, is_active, first_added,
-                last_updated, market_cap, pe_ratio, forward_pe, price_to_book,
-                dividend_yield, beta, fifty_two_week_high, fifty_two_week_low, info_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        '''
+        from db.connection import db_connection
+        columns = [
+            'symbol', 'company_name', 'security_name', 'market_category', 'exchange',
+            'sector', 'industry', 'country', 'is_etf', 'is_active', 'first_added',
+            'last_updated', 'market_cap', 'pe_ratio', 'forward_pe', 'price_to_book',
+            'dividend_yield', 'beta', 'fifty_two_week_high', 'fifty_two_week_low', 'info_json'
+        ]
+        sql = db_connection.insert_or_replace('stocks', columns, conflict_columns=['symbol'])
 
         self._execute_batch(sql, data)
 
@@ -204,11 +211,9 @@ class StockDB:
                     float(row.get('stock_splits', 0)) if pd.notna(row.get('stock_splits')) else 0
                 ))
 
-            sql = '''
-                INSERT OR REPLACE INTO price_history
-                (symbol, date, open, high, low, close, volume, dividends, stock_splits)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            '''
+            from db.connection import db_connection
+            columns = ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume', 'dividends', 'stock_splits']
+            sql = db_connection.insert_or_replace('price_history', columns, conflict_columns=['symbol', 'date'])
 
             self._execute_batch(sql, data)
 
@@ -797,6 +802,7 @@ class StockDB:
         Returns:
             list: 股票代码列表
         """
+        from db.connection import db_connection
         conn = self._connect()
 
         query = "SELECT symbol FROM stocks WHERE 1=1"
@@ -814,6 +820,7 @@ class StockDB:
             query += " AND is_active = ?"
             params.append(1 if is_active else 0)
 
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=params if params else None)
         conn.close()
 
@@ -832,6 +839,7 @@ class StockDB:
         Returns:
             DataFrame: 历史价格数据
         """
+        from db.connection import db_connection
         conn = self._connect()
 
         if columns:
@@ -852,6 +860,7 @@ class StockDB:
 
         query += " ORDER BY date"
 
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=params)
         conn.close()
 
@@ -867,8 +876,10 @@ class StockDB:
         Returns:
             float: 最新收盘价
         """
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT close FROM price_history WHERE symbol = ? ORDER BY date DESC LIMIT 1"
+        query = db_connection.convert_query_placeholders(query)
         result = pd.read_sql(query, conn, params=(symbol,))
         conn.close()
 
@@ -884,8 +895,10 @@ class StockDB:
         Returns:
             dict: 股票信息
         """
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT * FROM stocks WHERE symbol = ?"
+        query = db_connection.convert_query_placeholders(query)
         result = pd.read_sql(query, conn, params=(symbol,))
         conn.close()
 
@@ -907,8 +920,10 @@ class StockDB:
 
     def _get_metadata(self, symbol, data_type):
         """获取元数据"""
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT * FROM data_metadata WHERE symbol = ? AND data_type = ?"
+        query = db_connection.convert_query_placeholders(query)
         result = pd.read_sql(query, conn, params=(symbol, data_type))
         conn.close()
 
@@ -917,14 +932,15 @@ class StockDB:
     def _update_metadata(self, symbol, data_type, status='success',
                         last_success_date=None, error_message=None, record_count=None):
         """更新元数据"""
+        from db.connection import db_connection
+
         conn = self._connect()
         cursor = conn.cursor()
 
-        cursor.execute('''
-            INSERT OR REPLACE INTO data_metadata
-            (symbol, data_type, last_updated, last_success_date, status, error_message, record_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        columns = ['symbol', 'data_type', 'last_updated', 'last_success_date', 'status', 'error_message', 'record_count']
+        sql = db_connection.insert_or_replace('data_metadata', columns, conflict_columns=['symbol', 'data_type'])
+
+        cursor.execute(sql, (
             symbol,
             data_type,
             datetime.now(),
@@ -986,6 +1002,7 @@ class StockDB:
         Returns:
             DataFrame: 元数据记录
         """
+        from db.connection import db_connection
         conn = self._connect()
 
         query = "SELECT * FROM data_metadata WHERE 1=1"
@@ -1001,6 +1018,7 @@ class StockDB:
 
         query += " ORDER BY last_updated DESC"
 
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=params if params else None)
         conn.close()
 
@@ -1016,8 +1034,10 @@ class StockDB:
         Returns:
             DataFrame: Dividend data
         """
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT * FROM dividends WHERE symbol = ? ORDER BY date DESC"
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=(symbol,))
         conn.close()
 
@@ -1033,8 +1053,10 @@ class StockDB:
         Returns:
             DataFrame: Split data
         """
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT * FROM stock_splits WHERE symbol = ? ORDER BY date DESC"
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=(symbol,))
         conn.close()
 
@@ -1050,8 +1072,10 @@ class StockDB:
         Returns:
             DataFrame: Analyst rating data
         """
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT * FROM analyst_ratings WHERE symbol = ? ORDER BY rating_date DESC"
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=(symbol,))
         conn.close()
 
@@ -1067,8 +1091,10 @@ class StockDB:
         Returns:
             DataFrame: Price target data
         """
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT * FROM price_targets WHERE symbol = ? ORDER BY updated_date DESC"
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=(symbol,))
         conn.close()
 
@@ -1084,8 +1110,10 @@ class StockDB:
         Returns:
             DataFrame: Institutional holder data
         """
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT * FROM institutional_holders WHERE symbol = ? ORDER BY date_reported DESC"
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=(symbol,))
         conn.close()
 
@@ -1101,8 +1129,10 @@ class StockDB:
         Returns:
             DataFrame: Insider transaction data
         """
+        from db.connection import db_connection
         conn = self._connect()
         query = "SELECT * FROM insider_transactions WHERE symbol = ? ORDER BY transaction_date DESC"
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=(symbol,))
         conn.close()
 
@@ -1119,13 +1149,16 @@ class StockDB:
         Returns:
             DataFrame: Options data
         """
+        from db.connection import db_connection
         conn = self._connect()
 
         if expiration_date:
             query = "SELECT * FROM options_chain WHERE symbol = ? AND expiration_date = ? ORDER BY strike"
+            query = db_connection.convert_query_placeholders(query)
             df = pd.read_sql(query, conn, params=(symbol, expiration_date))
         else:
             query = "SELECT * FROM options_chain WHERE symbol = ? ORDER BY expiration_date, strike"
+            query = db_connection.convert_query_placeholders(query)
             df = pd.read_sql(query, conn, params=(symbol,))
 
         conn.close()
@@ -1143,6 +1176,7 @@ class StockDB:
         Returns:
             DataFrame: Technical indicator data
         """
+        from db.connection import db_connection
         conn = self._connect()
 
         query = "SELECT * FROM technical_indicators WHERE symbol = ?"
@@ -1158,6 +1192,7 @@ class StockDB:
 
         query += " ORDER BY date"
 
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=params)
         conn.close()
 
@@ -1248,6 +1283,7 @@ class StockDB:
         query += ' ORDER BY datetime ASC'
 
         conn = self._connect()
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=params)
         conn.close()
 
@@ -1434,6 +1470,7 @@ class StockDB:
         query += ' ORDER BY priority ASC, added_date DESC'
 
         conn = self._connect()
+        query = db_connection.convert_query_placeholders(query)
         df = pd.read_sql(query, conn, params=params)
         conn.close()
 

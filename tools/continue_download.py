@@ -1,6 +1,6 @@
+#!/usr/bin/env python3
 """
-Download all stocks price data
-Downloads in batches with progress tracking
+Continue downloading stocks that don't have price data yet
 """
 
 import sys
@@ -11,28 +11,42 @@ from config.database import config
 from db.api import StockDB
 import time
 
-def download_all_stocks():
-    """Download all stocks in batches"""
+def continue_download():
+    """Continue downloading remaining stocks"""
 
-    # Use PostgreSQL for better performance with large datasets
+    # Use PostgreSQL
     print("Switching to PostgreSQL backend...")
     config.switch_to_postgresql()
 
     db = StockDB()
 
     print("="*70)
-    print("DOWNLOADING ALL NASDAQ STOCKS TO POSTGRESQL")
+    print("CONTINUING NASDAQ STOCK DOWNLOAD TO POSTGRESQL")
     print("="*70)
 
     # Get all stocks
     all_stocks = db.get_stock_list()
-    print(f"\nTotal stocks to download: {len(all_stocks)}")
+    print(f"\nTotal stocks in database: {len(all_stocks)}")
+
+    # Get stocks that already have data
+    status = db.get_update_status(data_type='price_history')
+    symbols_with_data = set(status['symbol'].unique())
+
+    # Find stocks without data
+    stocks_to_download = [s for s in all_stocks if s not in symbols_with_data]
+
+    print(f"Stocks with data: {len(symbols_with_data)}")
+    print(f"Stocks to download: {len(stocks_to_download)}")
+
+    if len(stocks_to_download) == 0:
+        print("\n✓ All stocks already have data!")
+        return
 
     # Download in batches of 200
     batch_size = 200
-    total_batches = (len(all_stocks) + batch_size - 1) // batch_size
+    total_batches = (len(stocks_to_download) + batch_size - 1) // batch_size
 
-    print(f"Batch size: {batch_size}")
+    print(f"\nBatch size: {batch_size}")
     print(f"Total batches: {total_batches}")
     print(f"Workers per batch: 5 (to avoid rate limiting)")
 
@@ -41,13 +55,13 @@ def download_all_stocks():
 
     start_time = time.time()
 
-    for i in range(0, len(all_stocks), batch_size):
+    for i in range(0, len(stocks_to_download), batch_size):
         batch_num = (i // batch_size) + 1
-        batch = all_stocks[i:i+batch_size]
+        batch = stocks_to_download[i:i+batch_size]
 
         print(f"\n{'='*70}")
         print(f"BATCH {batch_num}/{total_batches}")
-        print(f"Stocks {i+1} to {min(i+batch_size, len(all_stocks))}")
+        print(f"Stocks {i+1} to {min(i+batch_size, len(stocks_to_download))}")
         print(f"{'='*70}")
 
         # Download batch
@@ -60,20 +74,20 @@ def download_all_stocks():
         elapsed = time.time() - start_time
         elapsed_min = elapsed / 60
         stocks_done = i + len(batch)
-        stocks_remaining = len(all_stocks) - stocks_done
+        stocks_remaining = len(stocks_to_download) - stocks_done
 
         if stocks_done > 0:
             rate = stocks_done / elapsed_min  # stocks per minute
             eta_min = stocks_remaining / rate if rate > 0 else 0
 
             print(f"\n--- Overall Progress ---")
-            print(f"Completed: {stocks_done}/{len(all_stocks)} stocks ({stocks_done/len(all_stocks)*100:.1f}%)")
+            print(f"Completed: {stocks_done}/{len(stocks_to_download)} stocks ({stocks_done/len(stocks_to_download)*100:.1f}%)")
             print(f"Success: {overall_success} | Failed: {overall_failed}")
             print(f"Elapsed time: {elapsed_min:.1f} minutes")
             print(f"Rate: {rate:.1f} stocks/minute")
             print(f"ETA: {eta_min:.1f} minutes remaining")
 
-        # Brief pause between batches to avoid overwhelming the API
+        # Brief pause between batches
         if batch_num < total_batches:
             print("\nPausing 2 seconds before next batch...")
             time.sleep(2)
@@ -85,11 +99,11 @@ def download_all_stocks():
     print("\n" + "="*70)
     print("DOWNLOAD COMPLETED!")
     print("="*70)
-    print(f"\nTotal stocks processed: {len(all_stocks)}")
-    print(f"Successful: {overall_success} ({overall_success/len(all_stocks)*100:.1f}%)")
-    print(f"Failed: {overall_failed} ({overall_failed/len(all_stocks)*100:.1f}%)")
+    print(f"\nTotal stocks processed: {len(stocks_to_download)}")
+    print(f"Successful: {overall_success} ({overall_success/len(stocks_to_download)*100:.1f}%)")
+    print(f"Failed: {overall_failed} ({overall_failed/len(stocks_to_download)*100:.1f}%)")
     print(f"Total time: {total_time_min:.1f} minutes ({total_time/3600:.2f} hours)")
-    print(f"Average rate: {len(all_stocks)/total_time_min:.1f} stocks/minute")
+    print(f"Average rate: {len(stocks_to_download)/total_time_min:.1f} stocks/minute")
 
     # Check PostgreSQL database size
     import psycopg2
@@ -103,7 +117,7 @@ def download_all_stocks():
     except Exception as e:
         print(f"\nCould not check database size: {e}")
 
-    # Show download status
+    # Show final status
     print("\n" + "="*70)
     print("Checking final status...")
     print("="*70)
@@ -111,6 +125,7 @@ def download_all_stocks():
     status = db.get_update_status()
     symbols_with_data = status[status['data_type']=='price_history']['symbol'].unique()
 
+    all_stocks = db.get_stock_list()
     print(f"\nStocks with price data: {len(symbols_with_data)}/{len(all_stocks)}")
     print(f"Coverage: {len(symbols_with_data)/len(all_stocks)*100:.1f}%")
 
@@ -119,4 +134,4 @@ def download_all_stocks():
         print("You can retry failed downloads later if needed.")
 
 if __name__ == "__main__":
-    download_all_stocks()
+    continue_download()

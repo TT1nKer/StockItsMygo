@@ -19,7 +19,8 @@ Custom Strategy Template
 """
 
 import sys
-sys.path.insert(0, 'd:/strategy=Z')
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from script.strategy_base import BaseStrategy
 import pandas as pd

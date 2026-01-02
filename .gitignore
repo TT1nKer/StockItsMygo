@@ -48,3 +48,4 @@ nul
 # Temporary files
 *.tmp
 *.temp
+pg-data/

@@ -31,7 +31,8 @@ Report structure:
 """
 
 import sys
-sys.path.insert(0, 'd:/strategy=Z')
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.api import StockDB
 from script.signals.momentum_signal import MomentumSignal

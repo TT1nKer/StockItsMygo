@@ -10,7 +10,8 @@ Test Anomaly Detector
 """
 
 import sys
-sys.path.insert(0, 'd:/strategy=Z')
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from script.anomaly_detector import AnomalyDetector
 from script.momentum_scanner import MomentumScanner

@@ -19,7 +19,17 @@
       "Bash(git commit:*)",
       "Bash(timeout 30 python:*)",
       "Bash(ls -lh \"d:\\\\strategy=Z\\\\DATA\\\\labels\"\" 2>&1 || echo \"Label directory not found \")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(brew --version:*)",
+      "Bash(git --version:*)",
+      "Bash(python3:*)",
+      "Bash(source venv/bin/activate)",
+      "Bash(pip install:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose:*)",
+      "Bash(open:*)",
+      "Bash(python db/init_db_postgres.py:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

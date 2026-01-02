@@ -1,0 +1,37 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: strategy-z-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: stock_password
+      POSTGRES_DB: stock_db
+      POSTGRES_USER: stock_user
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pg-data:/var/lib/postgresql/data
+      - ./db/pg-config/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
