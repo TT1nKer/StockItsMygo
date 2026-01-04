@@ -153,8 +153,8 @@ class StockRecommender:
                 'high_52w': float(high_52w),
                 'low_52w': float(low_52w),
                 'distance_from_high': round(distance_from_high, 2),
-                'is_breakout': is_breakout,
-                'has_volume_surge': has_volume,
+                'is_breakout': bool(is_breakout),
+                'has_volume_surge': bool(has_volume),
                 'score': score,
                 'signals': signals,
                 'date': str(latest['date'])
@@ -163,8 +163,8 @@ class StockRecommender:
             print(f"Error analyzing {symbol}: {e}")
             return None
 
-    def get_daily_recommendations(self, top_n=20):
-        """Get top N daily recommendations"""
+    def get_daily_recommendations(self, min_score=30):
+        """Get all daily recommendations above minimum score threshold"""
         print("Analyzing stocks for daily recommendations...")
 
         stocks = self.db.get_stock_list()
@@ -176,16 +176,15 @@ class StockRecommender:
                 print(f"Progress: {i+1}/{len(stocks)}")
 
             analysis = self.analyze_stock(symbol)
-            if analysis and analysis['score'] > 30:  # Minimum score threshold
+            if analysis and analysis['score'] >= min_score:
                 results.append(analysis)
 
         # Sort by score
         results.sort(key=lambda x: x['score'], reverse=True)
 
-        print(f"\nFound {len(results)} stocks with score > 30")
-        print(f"Returning top {top_n} recommendations")
+        print(f"\nFound {len(results)} stocks with score >= {min_score}")
 
-        return results[:top_n]
+        return results
 
     def save_recommendations(self, recommendations):
         """Save daily recommendations to database"""
@@ -268,10 +267,10 @@ if __name__ == '__main__':
     print("DAILY STOCK RECOMMENDATION SYSTEM")
     print("="*70)
 
-    # Generate recommendations
-    recommendations = recommender.get_daily_recommendations(top_n=20)
+    # Generate ALL recommendations (score >= 30)
+    recommendations = recommender.get_daily_recommendations(min_score=30)
 
-    # Save to database
+    # Save ALL to database (for web dashboard filtering)
     recommender.save_recommendations(recommendations)
 
     # Display top 10
