@@ -204,24 +204,28 @@ def search_stocks():
 
 @app.route('/api/recommendations')
 def get_daily_recommendations():
-    """Get today's stock recommendations"""
+    """Get today's stock recommendations with optional filtering"""
     try:
         import psycopg2
         from datetime import datetime
 
+        # Get filter parameters
+        min_score = request.args.get('min_score', 30, type=int)
+        max_results = request.args.get('limit', 200, type=int)  # Default: show up to 200
+
         conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
         cursor = conn.cursor()
 
-        # Get today's recommendations
+        # Get today's recommendations with score filter
         today = datetime.now().date()
         cursor.execute("""
             SELECT symbol, price, score, signals, rsi, momentum_10d,
                    is_breakout, has_volume_surge, recommendation_date
             FROM daily_recommendations
-            WHERE recommendation_date = %s
+            WHERE recommendation_date = %s AND score >= %s
             ORDER BY score DESC
-            LIMIT 20
-        """, (today,))
+            LIMIT %s
+        """, (today, min_score, max_results))
 
         recommendations = []
         for row in cursor.fetchall():
@@ -239,10 +243,31 @@ def get_daily_recommendations():
                 'links': get_stock_links(symbol)
             })
 
+        # Get counts by score range (before closing connection)
+        cursor.execute("""
+            SELECT
+                COUNT(CASE WHEN score >= 60 THEN 1 END) as high_score,
+                COUNT(CASE WHEN score >= 40 AND score < 60 THEN 1 END) as medium_score,
+                COUNT(CASE WHEN score >= 30 AND score < 40 THEN 1 END) as low_score,
+                COUNT(*) as total
+            FROM daily_recommendations
+            WHERE recommendation_date = %s
+        """, (today,))
+
+        counts = cursor.fetchone()
         conn.close()
-        return jsonify(recommendations)
+
+        return jsonify({
+            'recommendations': recommendations,
+            'counts': {
+                'high': counts[0] if counts else 0,
+                'medium': counts[1] if counts else 0,
+                'low': counts[2] if counts else 0,
+                'total': counts[3] if counts else 0
+            }
+        })
     except Exception as e:
-        return jsonify({'error': str(e), 'recommendations': []}), 500
+        return jsonify({'error': str(e), 'recommendations': [], 'counts': {}}), 500
 
 @app.route('/api/watchlist')
 def get_user_watchlist():

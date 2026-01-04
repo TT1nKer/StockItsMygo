@@ -347,6 +347,56 @@
             color: #1d9bf0;
             border: 1px solid #38444d;
         }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background: #16181c;
+            color: #8b98a5;
+            border: 2px solid #38444d;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .filter-btn:hover {
+            border-color: #1d9bf0;
+            color: #1d9bf0;
+        }
+
+        .filter-btn.active {
+            background: #1d9bf0;
+            color: white;
+            border-color: #1d9bf0;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: #38444d;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #1d9bf0;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #1d9bf0;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -416,6 +466,39 @@
                 <p style="color: #8b98a5; margin-bottom: 20px;">
                     AI-generated recommendations based on technical analysis, momentum, and volume patterns
                 </p>
+
+                <!-- Filter Controls -->
+                <div style="background: #0f1419; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #38444d;">
+                    <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label style="display: block; margin-bottom: 8px; color: #8b98a5;">
+                                Minimum Score: <span id="scoreValue" style="color: #1d9bf0; font-weight: bold;">30</span>
+                            </label>
+                            <input type="range" id="scoreSlider" min="20" max="70" value="30" step="5"
+                                   style="width: 100%;" onchange="updateScoreFilter()">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8em; color: #8b98a5; margin-top: 4px;">
+                                <span>20 (More)</span>
+                                <span>45 (Balanced)</span>
+                                <span>70 (Fewer, Higher Quality)</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button onclick="filterByScore('all')" class="filter-btn" id="filter-all">
+                                All (<span id="count-total">-</span>)
+                            </button>
+                            <button onclick="filterByScore('high')" class="filter-btn" id="filter-high">
+                                High 60+ (<span id="count-high">-</span>)
+                            </button>
+                            <button onclick="filterByScore('medium')" class="filter-btn" id="filter-medium">
+                                Medium 40-59 (<span id="count-medium">-</span>)
+                            </button>
+                            <button onclick="filterByScore('low')" class="filter-btn" id="filter-low">
+                                Low 30-39 (<span id="count-low">-</span>)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="recommendationsTable" class="loading">Loading...</div>
             </div>
         </div>
@@ -705,29 +788,90 @@
             document.getElementById(tabName + '-content').classList.add('active');
         }
 
+        // Current filter settings
+        let currentMinScore = 30;
+        let currentFilter = 'all';
+        let allRecommendations = [];
+
         // Load daily recommendations
-        async function loadRecommendations() {
+        async function loadRecommendations(minScore = 30) {
             try {
-                const response = await fetch('/api/recommendations');
+                const response = await fetch(`/api/recommendations?min_score=${minScore}&limit=500`);
                 const data = await response.json();
 
-                if (data.error || !data.length) {
+                if (data.error || !data.recommendations || data.recommendations.length === 0) {
                     document.getElementById('recommendationsTable').innerHTML = '<p class="loading">No recommendations today. Click "Update Data" to generate.</p>';
                     return;
                 }
 
-                displayRecommendationsTable(data);
+                // Store all recommendations
+                allRecommendations = data.recommendations;
+
+                // Update counts
+                document.getElementById('count-total').textContent = data.counts.total || 0;
+                document.getElementById('count-high').textContent = data.counts.high || 0;
+                document.getElementById('count-medium').textContent = data.counts.medium || 0;
+                document.getElementById('count-low').textContent = data.counts.low || 0;
+
+                // Display based on current filter
+                applyFilter();
             } catch (error) {
                 console.error('Error loading recommendations:', error);
                 document.getElementById('recommendationsTable').innerHTML = '<p class="loading">Error loading recommendations</p>';
             }
         }
 
+        // Update score filter from slider
+        function updateScoreFilter() {
+            const slider = document.getElementById('scoreSlider');
+            const value = slider.value;
+            document.getElementById('scoreValue').textContent = value;
+            currentMinScore = parseInt(value);
+            loadRecommendations(currentMinScore);
+        }
+
+        // Filter by score category
+        function filterByScore(category) {
+            currentFilter = category;
+
+            // Update button states
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`filter-${category}`).classList.add('active');
+
+            applyFilter();
+        }
+
+        // Apply current filter to recommendations
+        function applyFilter() {
+            let filtered = allRecommendations;
+
+            if (currentFilter === 'high') {
+                filtered = allRecommendations.filter(r => r.score >= 60);
+            } else if (currentFilter === 'medium') {
+                filtered = allRecommendations.filter(r => r.score >= 40 && r.score < 60);
+            } else if (currentFilter === 'low') {
+                filtered = allRecommendations.filter(r => r.score >= 30 && r.score < 40);
+            }
+
+            displayRecommendationsTable(filtered);
+        }
+
         // Display recommendations table
         function displayRecommendationsTable(recs) {
             const container = document.getElementById('recommendationsTable');
 
+            if (recs.length === 0) {
+                container.innerHTML = '<p class="loading">No stocks match the current filter criteria. Try lowering the minimum score.</p>';
+                return;
+            }
+
             let html = `
+                <div style="margin-bottom: 15px; padding: 10px; background: #0f1419; border-radius: 6px; border: 1px solid #38444d;">
+                    <strong style="color: #1d9bf0;">Showing ${recs.length} stocks</strong>
+                    <span style="color: #8b98a5; margin-left: 10px;">
+                        (Scores: ${Math.min(...recs.map(r => r.score))} - ${Math.max(...recs.map(r => r.score))})
+                    </span>
+                </div>
                 <table class="stock-table">
                     <thead>
                         <tr>
