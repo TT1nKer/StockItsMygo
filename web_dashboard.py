@@ -202,31 +202,207 @@ def search_stocks():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/watchlist')
-def get_watchlist():
-    """Get popular tech stocks watchlist"""
-    popular_stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX']
+@app.route('/api/recommendations')
+def get_daily_recommendations():
+    """Get today's stock recommendations"""
+    try:
+        import psycopg2
+        from datetime import datetime
 
-    watchlist = []
-    for symbol in popular_stocks:
-        try:
+        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        cursor = conn.cursor()
+
+        # Get today's recommendations
+        today = datetime.now().date()
+        cursor.execute("""
+            SELECT symbol, price, score, signals, rsi, momentum_10d,
+                   is_breakout, has_volume_surge, recommendation_date
+            FROM daily_recommendations
+            WHERE recommendation_date = %s
+            ORDER BY score DESC
+            LIMIT 20
+        """, (today,))
+
+        recommendations = []
+        for row in cursor.fetchall():
+            symbol, price, score, signals, rsi, momentum, is_breakout, has_volume, rec_date = row
+            recommendations.append({
+                'symbol': symbol,
+                'price': float(price) if price else 0,
+                'score': score,
+                'signals': signals if signals else [],
+                'rsi': float(rsi) if rsi else 0,
+                'momentum': float(momentum) if momentum else 0,
+                'is_breakout': is_breakout,
+                'has_volume_surge': has_volume,
+                'date': str(rec_date),
+                'links': get_stock_links(symbol)
+            })
+
+        conn.close()
+        return jsonify(recommendations)
+    except Exception as e:
+        return jsonify({'error': str(e), 'recommendations': []}), 500
+
+@app.route('/api/watchlist')
+def get_user_watchlist():
+    """Get user's personal watchlist"""
+    try:
+        import psycopg2
+
+        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        cursor = conn.cursor()
+
+        # Get watchlist stocks
+        cursor.execute("""
+            SELECT symbol, added_date, target_date, notes
+            FROM user_watchlist
+            WHERE is_active = true
+            ORDER BY added_date DESC
+        """)
+
+        watchlist = []
+        for row in cursor.fetchall():
+            symbol, added_date, target_date, notes = row
+
+            # Get latest price
             history = db.get_price_history(symbol)
             if len(history) >= 2:
                 latest = history.iloc[-1]
                 previous = history.iloc[-2]
+                added_price = None
+
+                # Get price at add date
+                added_row = history[history['date'] == str(added_date)]
+                if len(added_row) > 0:
+                    added_price = float(added_row.iloc[0]['close'])
+
                 change_pct = ((latest['close'] - previous['close']) / previous['close']) * 100
+                change_since_add = ((latest['close'] - added_price) / added_price * 100) if added_price else 0
 
                 watchlist.append({
                     'symbol': symbol,
                     'price': round(latest['close'], 2),
                     'change': round(change_pct, 2),
+                    'added_price': round(added_price, 2) if added_price else None,
+                    'change_since_add': round(change_since_add, 2) if added_price else None,
+                    'added_date': str(added_date),
+                    'target_date': str(target_date) if target_date else None,
+                    'days_remaining': (target_date - datetime.now().date()).days if target_date else None,
+                    'notes': notes,
                     'volume': int(latest['volume']),
                     'links': get_stock_links(symbol)
                 })
-        except:
-            continue
 
-    return jsonify(watchlist)
+        conn.close()
+        return jsonify(watchlist)
+    except Exception as e:
+        return jsonify({'error': str(e), 'watchlist': []}), 500
+
+@app.route('/api/watchlist/add', methods=['POST'])
+def add_to_watchlist():
+    """Add stock to watchlist"""
+    try:
+        import psycopg2
+        from datetime import datetime, timedelta
+
+        data = request.json
+        symbol = data.get('symbol')
+        notes = data.get('notes', '')
+        days = data.get('days', 14)
+
+        if not symbol:
+            return jsonify({'error': 'Symbol required'}), 400
+
+        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        cursor = conn.cursor()
+
+        # Create table if not exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_watchlist (
+                id SERIAL PRIMARY KEY,
+                symbol VARCHAR(20),
+                added_date DATE DEFAULT CURRENT_DATE,
+                target_date DATE,
+                notes TEXT,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(symbol)
+            )
+        """)
+
+        # Add to watchlist
+        today = datetime.now().date()
+        target = today + timedelta(days=days)
+
+        cursor.execute("""
+            INSERT INTO user_watchlist (symbol, added_date, target_date, notes, is_active)
+            VALUES (%s, %s, %s, %s, true)
+            ON CONFLICT (symbol) DO UPDATE SET
+                is_active = true,
+                target_date = EXCLUDED.target_date,
+                notes = EXCLUDED.notes
+        """, (symbol, today, target, notes))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({'success': True, 'message': f'{symbol} added to watchlist'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/watchlist/remove/<symbol>', methods=['DELETE'])
+def remove_from_watchlist(symbol):
+    """Remove stock from watchlist"""
+    try:
+        import psycopg2
+
+        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE user_watchlist
+            SET is_active = false
+            WHERE symbol = %s
+        """, (symbol,))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({'success': True, 'message': f'{symbol} removed from watchlist'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/update', methods=['POST'])
+def update_data():
+    """Trigger data update and recommendation generation"""
+    try:
+        import subprocess
+
+        # Run update script
+        result = subprocess.run(
+            ['python', 'tools/update_recent_data.py', '--days', '5'],
+            capture_output=True,
+            text=True,
+            timeout=600
+        )
+
+        # Run recommendation generation
+        rec_result = subprocess.run(
+            ['python', 'strategy_recommender.py'],
+            capture_output=True,
+            text=True,
+            timeout=600
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'Data updated and recommendations generated',
+            'update_output': result.stdout[:500],
+            'rec_output': rec_result.stdout[:500]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print('=' * 70)

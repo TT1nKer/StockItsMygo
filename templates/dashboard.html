@@ -260,6 +260,93 @@
             border-radius: 8px;
             border: 1px solid #38444d;
         }
+
+        .update-btn {
+            background: linear-gradient(135deg, #00ba7c 0%, #00a868 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0, 186, 124, 0.3);
+            transition: all 0.3s;
+        }
+
+        .update-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 186, 124, 0.4);
+        }
+
+        .update-btn:disabled {
+            background: #38444d;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .watchlist-btn, .remove-btn {
+            display: inline-block;
+            padding: 6px 14px;
+            background: #1d9bf0;
+            color: white;
+            text-decoration: none;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .watchlist-btn:hover {
+            background: #0084b4;
+        }
+
+        .remove-btn {
+            background: #f4212e;
+        }
+
+        .remove-btn:hover {
+            background: #c91a26;
+        }
+
+        .score-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.85em;
+        }
+
+        .score-high {
+            background: #00ba7c;
+            color: white;
+        }
+
+        .score-medium {
+            background: #ffa500;
+            color: white;
+        }
+
+        .score-low {
+            background: #8b98a5;
+            color: white;
+        }
+
+        .signals-list {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .signal-tag {
+            background: #16181c;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            color: #1d9bf0;
+            border: 1px solid #38444d;
+        }
     </style>
 </head>
 <body>
@@ -304,17 +391,42 @@
             <div id="searchResults"></div>
         </div>
 
+        <!-- Update Button -->
+        <div class="section" style="text-align: center;">
+            <button onclick="updateData()" class="update-btn" id="updateBtn">
+                🔄 Update Data & Generate Daily Picks
+            </button>
+            <p style="color: #8b98a5; margin-top: 10px; font-size: 0.9em;">
+                Updates last 5 days of prices and generates new daily recommendations
+            </p>
+        </div>
+
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('watchlist')">Watchlist</button>
-            <button class="tab" onclick="switchTab('gainers')">Top Gainers</button>
-            <button class="tab" onclick="switchTab('losers')">Top Losers</button>
+            <button class="tab active" onclick="switchTab('recommendations')">📊 Daily Picks</button>
+            <button class="tab" onclick="switchTab('watchlist')">👁️ My Watchlist</button>
+            <button class="tab" onclick="switchTab('gainers')">🚀 Top Gainers</button>
+            <button class="tab" onclick="switchTab('losers')">📉 Top Losers</button>
+        </div>
+
+        <!-- Daily Recommendations Tab -->
+        <div class="tab-content active" id="recommendations-content">
+            <div class="section">
+                <h2 class="section-title">📊 Today's Stock Picks</h2>
+                <p style="color: #8b98a5; margin-bottom: 20px;">
+                    AI-generated recommendations based on technical analysis, momentum, and volume patterns
+                </p>
+                <div id="recommendationsTable" class="loading">Loading...</div>
+            </div>
         </div>
 
         <!-- Watchlist Tab -->
-        <div class="tab-content active" id="watchlist-content">
+        <div class="tab-content" id="watchlist-content">
             <div class="section">
-                <h2 class="section-title">Popular Tech Stocks</h2>
+                <h2 class="section-title">👁️ My 14-Day Watchlist</h2>
+                <p style="color: #8b98a5; margin-bottom: 20px;">
+                    Track stocks you're monitoring for 14 days. Click "Add to Watchlist" on any stock to start tracking.
+                </p>
                 <div id="watchlistTable" class="loading">Loading...</div>
             </div>
         </div>
@@ -593,9 +705,220 @@
             document.getElementById(tabName + '-content').classList.add('active');
         }
 
+        // Load daily recommendations
+        async function loadRecommendations() {
+            try {
+                const response = await fetch('/api/recommendations');
+                const data = await response.json();
+
+                if (data.error || !data.length) {
+                    document.getElementById('recommendationsTable').innerHTML = '<p class="loading">No recommendations today. Click "Update Data" to generate.</p>';
+                    return;
+                }
+
+                displayRecommendationsTable(data);
+            } catch (error) {
+                console.error('Error loading recommendations:', error);
+                document.getElementById('recommendationsTable').innerHTML = '<p class="loading">Error loading recommendations</p>';
+            }
+        }
+
+        // Display recommendations table
+        function displayRecommendationsTable(recs) {
+            const container = document.getElementById('recommendationsTable');
+
+            let html = `
+                <table class="stock-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Symbol</th>
+                            <th>Price</th>
+                            <th>Score</th>
+                            <th>Signals</th>
+                            <th>RSI</th>
+                            <th>Momentum</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            recs.forEach((rec, idx) => {
+                const scoreClass = rec.score >= 60 ? 'score-high' : rec.score >= 40 ? 'score-medium' : 'score-low';
+                const signals = rec.signals.slice(0, 3).map(s => `<span class="signal-tag">${s}</span>`).join('');
+
+                html += `
+                    <tr>
+                        <td><strong>#${idx + 1}</strong></td>
+                        <td><span class="stock-symbol" onclick="showStockDetail('${rec.symbol}')">${rec.symbol}</span></td>
+                        <td>$${rec.price.toFixed(2)}</td>
+                        <td><span class="score-badge ${scoreClass}">${rec.score}</span></td>
+                        <td><div class="signals-list">${signals}</div></td>
+                        <td>${rec.rsi.toFixed(1)}</td>
+                        <td class="${rec.momentum >= 0 ? 'positive' : 'negative'}">${rec.momentum.toFixed(1)}%</td>
+                        <td>
+                            <button class="watchlist-btn" onclick="addToWatchlist('${rec.symbol}')">👁️ Watch</button>
+                            <a href="${rec.links.yahoo}" target="_blank" class="link-btn">Yahoo</a>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // Load user watchlist
+        async function loadWatchlist() {
+            try {
+                const response = await fetch('/api/watchlist');
+                const data = await response.json();
+
+                if (data.error || !data.watchlist || data.watchlist.length === 0) {
+                    document.getElementById('watchlistTable').innerHTML = `
+                        <p class="loading">Your watchlist is empty. Add stocks from Daily Picks or search results.</p>
+                    `;
+                    return;
+                }
+
+                displayWatchlistTable(data.watchlist);
+            } catch (error) {
+                console.error('Error loading watchlist:', error);
+            }
+        }
+
+        // Display watchlist table
+        function displayWatchlistTable(stocks) {
+            const container = document.getElementById('watchlistTable');
+
+            let html = `
+                <table class="stock-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Current Price</th>
+                            <th>Added Price</th>
+                            <th>Change Since Add</th>
+                            <th>Days Left</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            stocks.forEach(stock => {
+                const changeClass = stock.change_since_add >= 0 ? 'positive' : 'negative';
+                const changeIcon = stock.change_since_add >= 0 ? '↑' : '↓';
+                const daysLeft = stock.days_remaining || 0;
+                const daysColor = daysLeft <= 3 ? '#f4212e' : daysLeft <= 7 ? '#ffa500' : '#00ba7c';
+
+                html += `
+                    <tr>
+                        <td><span class="stock-symbol" onclick="showStockDetail('${stock.symbol}')">${stock.symbol}</span></td>
+                        <td>$${stock.price.toFixed(2)}</td>
+                        <td>$${stock.added_price ? stock.added_price.toFixed(2) : 'N/A'}</td>
+                        <td class="${changeClass}">
+                            ${stock.change_since_add !== null ? changeIcon + ' ' + Math.abs(stock.change_since_add).toFixed(2) + '%' : 'N/A'}
+                        </td>
+                        <td style="color: ${daysColor}; font-weight: bold;">${daysLeft} days</td>
+                        <td>${stock.notes || '-'}</td>
+                        <td>
+                            <button class="remove-btn" onclick="removeFromWatchlist('${stock.symbol}')">Remove</button>
+                            <a href="${stock.links.yahoo}" target="_blank" class="link-btn">Yahoo</a>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // Add to watchlist
+        async function addToWatchlist(symbol) {
+            try {
+                const response = await fetch('/api/watchlist/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        days: 14,
+                        notes: 'Added from daily picks'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✓ ${symbol} added to your 14-day watchlist!`);
+                    loadWatchlist();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error adding to watchlist:', error);
+                alert('Error adding stock to watchlist');
+            }
+        }
+
+        // Remove from watchlist
+        async function removeFromWatchlist(symbol) {
+            if (!confirm(`Remove ${symbol} from watchlist?`)) return;
+
+            try {
+                const response = await fetch(`/api/watchlist/remove/${symbol}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✓ ${symbol} removed from watchlist`);
+                    loadWatchlist();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error removing from watchlist:', error);
+                alert('Error removing stock from watchlist');
+            }
+        }
+
+        // Update data
+        async function updateData() {
+            const btn = document.getElementById('updateBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Updating... (this may take a few minutes)';
+
+            try {
+                const response = await fetch('/api/update', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✓ Data updated successfully! Refreshing recommendations...');
+                    loadRecommendations();
+                    loadStats();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error updating data:', error);
+                alert('Error updating data. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Update Data & Generate Daily Picks';
+            }
+        }
+
         // Load data on page load
         window.addEventListener('load', () => {
             loadStats();
+            loadRecommendations();
             loadWatchlist();
             loadTopMovers();
         });
