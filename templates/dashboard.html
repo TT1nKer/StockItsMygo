@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Analysis Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f1419;
+            color: #e7e9ea;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1d9bf0 0%, #0084b4 100%);
+            padding: 30px 0;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #16181c;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #38444d;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #8b98a5;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #1d9bf0;
+        }
+
+        .section {
+            background: #16181c;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            border: 1px solid #38444d;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #e7e9ea;
+            border-bottom: 2px solid #38444d;
+            padding-bottom: 10px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 1em;
+            border: 2px solid #38444d;
+            border-radius: 25px;
+            background: #0f1419;
+            color: #e7e9ea;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-box:focus {
+            border-color: #1d9bf0;
+        }
+
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .stock-table th {
+            background: #0f1419;
+            padding: 12px;
+            text-align: left;
+            color: #8b98a5;
+            font-weight: 600;
+            border-bottom: 2px solid #38444d;
+        }
+
+        .stock-table td {
+            padding: 12px;
+            border-bottom: 1px solid #38444d;
+        }
+
+        .stock-table tr:hover {
+            background: #1e2732;
+        }
+
+        .stock-symbol {
+            font-weight: bold;
+            color: #1d9bf0;
+            cursor: pointer;
+            font-size: 1.1em;
+        }
+
+        .stock-symbol:hover {
+            text-decoration: underline;
+        }
+
+        .positive {
+            color: #00ba7c;
+        }
+
+        .negative {
+            color: #f4212e;
+        }
+
+        .links {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .link-btn {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #1d9bf0;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.85em;
+            transition: background 0.3s;
+        }
+
+        .link-btn:hover {
+            background: #0084b4;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #8b98a5;
+            font-size: 1.2em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #38444d;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: #8b98a5;
+            font-size: 1em;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #1d9bf0;
+            border-bottom-color: #1d9bf0;
+        }
+
+        .tab:hover {
+            color: #e7e9ea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        #stockChart {
+            width: 100%;
+            height: 500px;
+            margin-top: 20px;
+        }
+
+        .stock-detail {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .stock-detail-content {
+            max-width: 1200px;
+            margin: 50px auto;
+            background: #16181c;
+            border-radius: 12px;
+            padding: 30px;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #f4212e;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .close-btn:hover {
+            background: #c91a26;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .detail-item {
+            background: #0f1419;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #38444d;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>📈 Stock Analysis Dashboard</h1>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Statistics -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-label">Total Stocks</div>
+                <div class="stat-value" id="totalStocks">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">With Data</div>
+                <div class="stat-value" id="stocksWithData">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Coverage</div>
+                <div class="stat-value" id="coverage">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Records</div>
+                <div class="stat-value" id="totalRecords">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Database Size</div>
+                <div class="stat-value" id="dbSize">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Latest Data</div>
+                <div class="stat-value" style="font-size: 1.3em;" id="latestDate">-</div>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <div class="section">
+            <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search stocks by symbol (e.g., AAPL, MSFT)...">
+            <div id="searchResults"></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('watchlist')">Watchlist</button>
+            <button class="tab" onclick="switchTab('gainers')">Top Gainers</button>
+            <button class="tab" onclick="switchTab('losers')">Top Losers</button>
+        </div>
+
+        <!-- Watchlist Tab -->
+        <div class="tab-content active" id="watchlist-content">
+            <div class="section">
+                <h2 class="section-title">Popular Tech Stocks</h2>
+                <div id="watchlistTable" class="loading">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Gainers Tab -->
+        <div class="tab-content" id="gainers-content">
+            <div class="section">
+                <h2 class="section-title">🚀 Top Gainers</h2>
+                <div id="gainersTable" class="loading">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Losers Tab -->
+        <div class="tab-content" id="losers-content">
+            <div class="section">
+                <h2 class="section-title">📉 Top Losers</h2>
+                <div id="losersTable" class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Detail Modal -->
+    <div class="stock-detail" id="stockDetail">
+        <div class="stock-detail-content">
+            <button class="close-btn" onclick="closeStockDetail()">✕ Close</button>
+            <h2 id="detailSymbol">-</h2>
+            <div class="detail-grid" id="detailGrid"></div>
+            <div class="links" id="detailLinks"></div>
+            <div id="stockChart"></div>
+        </div>
+    </div>
+
+    <script>
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+
+                document.getElementById('totalStocks').textContent = data.total_stocks.toLocaleString();
+                document.getElementById('stocksWithData').textContent = data.stocks_with_data.toLocaleString();
+                document.getElementById('coverage').textContent = data.coverage + '%';
+                document.getElementById('totalRecords').textContent = data.total_records.toLocaleString();
+                document.getElementById('dbSize').textContent = data.db_size;
+                document.getElementById('latestDate').textContent = data.latest_date;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load watchlist
+        async function loadWatchlist() {
+            try {
+                const response = await fetch('/api/watchlist');
+                const data = await response.json();
+                displayStockTable(data, 'watchlistTable');
+            } catch (error) {
+                console.error('Error loading watchlist:', error);
+            }
+        }
+
+        // Load top movers
+        async function loadTopMovers() {
+            try {
+                const response = await fetch('/api/top_movers');
+                const data = await response.json();
+
+                displayStockTable(data.gainers, 'gainersTable');
+                displayStockTable(data.losers, 'losersTable');
+            } catch (error) {
+                console.error('Error loading top movers:', error);
+            }
+        }
+
+        // Display stock table
+        function displayStockTable(stocks, elementId) {
+            const container = document.getElementById(elementId);
+
+            if (stocks.length === 0) {
+                container.innerHTML = '<p class="loading">No data available</p>';
+                return;
+            }
+
+            let html = `
+                <table class="stock-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Price</th>
+                            <th>Change</th>
+                            <th>Volume</th>
+                            <th>Links</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            stocks.forEach(stock => {
+                const changeClass = stock.change >= 0 ? 'positive' : 'negative';
+                const changeIcon = stock.change >= 0 ? '↑' : '↓';
+
+                html += `
+                    <tr>
+                        <td><span class="stock-symbol" onclick="showStockDetail('${stock.symbol}')">${stock.symbol}</span></td>
+                        <td>$${stock.price.toFixed(2)}</td>
+                        <td class="${changeClass}">${changeIcon} ${Math.abs(stock.change).toFixed(2)}%</td>
+                        <td>${stock.volume.toLocaleString()}</td>
+                        <td class="links">
+                            <a href="${stock.links.yahoo}" target="_blank" class="link-btn">Yahoo</a>
+                            <a href="${stock.links.finviz}" target="_blank" class="link-btn">Finviz</a>
+                            <a href="${stock.links.tradingview}" target="_blank" class="link-btn">TradingView</a>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // Show stock detail
+        async function showStockDetail(symbol) {
+            try {
+                const response = await fetch(`/api/stock/${symbol}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                document.getElementById('detailSymbol').textContent = symbol;
+
+                // Display metrics
+                const grid = document.getElementById('detailGrid');
+                const changeClass1d = data.change_1d >= 0 ? 'positive' : 'negative';
+                const changeClass5d = data.change_5d >= 0 ? 'positive' : 'negative';
+                const changeClass1m = data.change_1m >= 0 ? 'positive' : 'negative';
+
+                grid.innerHTML = `
+                    <div class="detail-item">
+                        <div class="stat-label">Latest Price</div>
+                        <div class="stat-value">$${data.latest_price}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="stat-label">1-Day Change</div>
+                        <div class="stat-value ${changeClass1d}">${data.change_1d}%</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="stat-label">5-Day Change</div>
+                        <div class="stat-value ${changeClass5d}">${data.change_5d}%</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="stat-label">1-Month Change</div>
+                        <div class="stat-value ${changeClass1m}">${data.change_1m}%</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="stat-label">52-Week High</div>
+                        <div class="stat-value">$${data.high_52w}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="stat-label">52-Week Low</div>
+                        <div class="stat-value">$${data.low_52w}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="stat-label">Volume</div>
+                        <div class="stat-value">${(data.volume / 1000000).toFixed(1)}M</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="stat-label">Total Records</div>
+                        <div class="stat-value">${data.total_records}</div>
+                    </div>
+                `;
+
+                // Display links
+                const links = document.getElementById('detailLinks');
+                links.innerHTML = `
+                    <h3 style="width: 100%; margin-top: 20px; margin-bottom: 10px;">External Resources:</h3>
+                    <a href="${data.links.yahoo}" target="_blank" class="link-btn">Yahoo Finance</a>
+                    <a href="${data.links.finviz}" target="_blank" class="link-btn">Finviz</a>
+                    <a href="${data.links.marketwatch}" target="_blank" class="link-btn">MarketWatch</a>
+                    <a href="${data.links.seeking_alpha}" target="_blank" class="link-btn">Seeking Alpha</a>
+                    <a href="${data.links.tradingview}" target="_blank" class="link-btn">TradingView</a>
+                    <a href="${data.links.google}" target="_blank" class="link-btn">Google Finance</a>
+                `;
+
+                // Create candlestick chart
+                const trace = {
+                    x: data.chart_data.dates,
+                    close: data.chart_data.close,
+                    high: data.chart_data.high,
+                    low: data.chart_data.low,
+                    open: data.chart_data.open,
+                    type: 'candlestick',
+                    name: symbol,
+                    increasing: {line: {color: '#00ba7c'}},
+                    decreasing: {line: {color: '#f4212e'}}
+                };
+
+                const layout = {
+                    title: `${symbol} - Last 6 Months`,
+                    paper_bgcolor: '#16181c',
+                    plot_bgcolor: '#0f1419',
+                    font: {color: '#e7e9ea'},
+                    xaxis: {
+                        gridcolor: '#38444d',
+                        showgrid: true
+                    },
+                    yaxis: {
+                        gridcolor: '#38444d',
+                        showgrid: true
+                    }
+                };
+
+                Plotly.newPlot('stockChart', [trace], layout, {responsive: true});
+
+                document.getElementById('stockDetail').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading stock detail:', error);
+                alert('Error loading stock data');
+            }
+        }
+
+        function closeStockDetail() {
+            document.getElementById('stockDetail').style.display = 'none';
+        }
+
+        // Search functionality
+        let searchTimeout;
+        document.getElementById('searchBox').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+
+            if (query.length < 1) {
+                document.getElementById('searchResults').innerHTML = '';
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                    const results = await response.json();
+
+                    if (results.length === 0) {
+                        document.getElementById('searchResults').innerHTML = '<p class="loading">No matches found</p>';
+                        return;
+                    }
+
+                    let html = '<table class="stock-table"><thead><tr><th>Symbol</th><th>Name</th><th>Sector</th></tr></thead><tbody>';
+                    results.forEach(stock => {
+                        html += `
+                            <tr onclick="showStockDetail('${stock.symbol}')" style="cursor: pointer;">
+                                <td class="stock-symbol">${stock.symbol}</td>
+                                <td>${stock.name}</td>
+                                <td>${stock.sector}</td>
+                            </tr>
+                        `;
+                    });
+                    html += '</tbody></table>';
+
+                    document.getElementById('searchResults').innerHTML = html;
+                } catch (error) {
+                    console.error('Error searching:', error);
+                }
+            }, 300);
+        });
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName + '-content').classList.add('active');
+        }
+
+        // Load data on page load
+        window.addEventListener('load', () => {
+            loadStats();
+            loadWatchlist();
+            loadTopMovers();
+        });
+    </script>
+</body>
+</html>
