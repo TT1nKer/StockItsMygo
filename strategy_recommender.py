@@ -214,21 +214,21 @@ class StockRecommender:
             )
         """)
 
-        # Insert recommendations
+        # Insert recommendations (convert all numpy types to Python types)
         today = datetime.now().date()
         values = [
             (
-                r['symbol'],
+                str(r['symbol']),
                 today,
-                r['price'],
-                r['score'],
+                float(r['price']),
+                int(r['score']),
                 r['signals'],
-                r['rsi'],
-                r['momentum_10d'],
-                r['momentum_20d'],
-                r['volume_trend'],
-                r['is_breakout'],
-                r['has_volume_surge']
+                float(r['rsi']) if r['rsi'] is not None else None,
+                float(r['momentum_10d']) if r['momentum_10d'] is not None else None,
+                float(r['momentum_20d']) if r['momentum_20d'] is not None else None,
+                float(r['volume_trend']) if r['volume_trend'] is not None else None,
+                bool(r['is_breakout']),
+                bool(r['has_volume_surge'])
             )
             for r in recommendations
         ]

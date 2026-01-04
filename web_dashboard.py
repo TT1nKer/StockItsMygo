@@ -403,29 +403,56 @@ def update_data():
     """Trigger data update and recommendation generation"""
     try:
         import subprocess
+        import os
+
+        # Get the virtual environment python path
+        venv_python = os.path.join(os.getcwd(), 'venv', 'bin', 'python')
 
         # Run update script
+        print("Starting data update (last 5 days)...")
         result = subprocess.run(
-            ['python', 'tools/update_recent_data.py', '--days', '5'],
+            [venv_python, 'tools/update_recent_data.py', '--days', '5'],
             capture_output=True,
             text=True,
-            timeout=600
+            timeout=600,
+            cwd=os.getcwd()
         )
 
-        # Run recommendation generation
+        if result.returncode != 0:
+            return jsonify({
+                'success': False,
+                'error': 'Data update failed',
+                'stderr': result.stderr[:1000]
+            }), 500
+
+        # Run recommendation generation (can take 5-10 minutes)
+        print("Generating stock recommendations (analyzing 2,138 stocks)...")
         rec_result = subprocess.run(
-            ['python', 'strategy_recommender.py'],
+            [venv_python, 'strategy_recommender.py'],
             capture_output=True,
             text=True,
-            timeout=600
+            timeout=900,  # 15 minutes timeout
+            cwd=os.getcwd()
         )
+
+        if rec_result.returncode != 0:
+            return jsonify({
+                'success': False,
+                'error': 'Recommendation generation failed',
+                'stderr': rec_result.stderr[:1000]
+            }), 500
 
         return jsonify({
             'success': True,
-            'message': 'Data updated and recommendations generated',
-            'update_output': result.stdout[:500],
-            'rec_output': rec_result.stdout[:500]
+            'message': 'Data updated and recommendations generated successfully',
+            'update_output': result.stdout[-500:] if result.stdout else '',
+            'rec_output': rec_result.stdout[-500:] if rec_result.stdout else ''
         })
+    except subprocess.TimeoutExpired as e:
+        return jsonify({
+            'error': 'Update timed out (process took too long)',
+            'details': str(e)
+        }), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
