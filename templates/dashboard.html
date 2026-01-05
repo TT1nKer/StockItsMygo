@@ -941,16 +941,20 @@
                 const response = await fetch('/api/watchlist');
                 const data = await response.json();
 
-                if (data.error || !data.watchlist || data.watchlist.length === 0) {
+                // API returns array directly, not {watchlist: [...]}
+                if (!Array.isArray(data) || data.length === 0) {
                     document.getElementById('watchlistTable').innerHTML = `
-                        <p class="loading">Your watchlist is empty. Add stocks from Daily Picks or search results.</p>
+                        <p class="loading">Your watchlist is empty. Add stocks from Daily Picks.</p>
                     `;
                     return;
                 }
 
-                displayWatchlistTable(data.watchlist);
+                displayWatchlistTable(data);
             } catch (error) {
                 console.error('Error loading watchlist:', error);
+                document.getElementById('watchlistTable').innerHTML = `
+                    <p class="loading">Error loading watchlist: ${error.message}</p>
+                `;
             }
         }
 
