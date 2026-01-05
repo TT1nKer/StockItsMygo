@@ -15,8 +15,17 @@ import pandas as pd
 import plotly.graph_objs as go
 import plotly.utils
 import json
+import threading
 
 app = Flask(__name__)
+
+# Global variable to track update progress
+update_status = {
+    'running': False,
+    'progress': [],
+    'current_step': '',
+    'error': None
+}
 
 # Use PostgreSQL backend
 config.switch_to_postgresql()
@@ -398,63 +407,115 @@ def remove_from_watchlist(symbol):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/update', methods=['POST'])
-def update_data():
-    """Trigger data update and recommendation generation"""
-    try:
-        import subprocess
-        import os
+def run_update_background():
+    """Background thread function to run update"""
+    global update_status
+    import subprocess
 
-        # Get the virtual environment python path
+    try:
         venv_python = os.path.join(os.getcwd(), 'venv', 'bin', 'python')
 
-        # Run update script (with --yes to skip confirmation prompt)
-        print("Starting data update (last 5 days)...")
-        result = subprocess.run(
+        # Step 1: Update price data
+        update_status['current_step'] = 'Downloading latest price data (last 5 days)...'
+        update_status['progress'].append(update_status['current_step'])
+
+        result = subprocess.Popen(
             [venv_python, 'tools/update_recent_data.py', '--days', '5', '--yes'],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=600,
             cwd=os.getcwd()
         )
+
+        # Read output line by line
+        for line in result.stdout:
+            line = line.strip()
+            if line and not line.startswith('/'):  # Filter out file paths and warnings
+                if 'Batch' in line or 'SUCCESS' in line or 'Progress:' in line or 'stocks' in line:
+                    update_status['progress'].append(line)
+
+        result.wait()
 
         if result.returncode != 0:
-            return jsonify({
-                'success': False,
-                'error': 'Data update failed',
-                'stderr': result.stderr[:1000]
-            }), 500
+            update_status['error'] = 'Data update failed'
+            update_status['running'] = False
+            return
 
-        # Run recommendation generation (can take 5-10 minutes)
-        print("Generating stock recommendations (analyzing 2,138 stocks)...")
-        rec_result = subprocess.run(
+        update_status['progress'].append('✓ Price data updated successfully')
+
+        # Step 2: Generate recommendations
+        update_status['current_step'] = 'Analyzing 2,138 stocks and generating recommendations...'
+        update_status['progress'].append(update_status['current_step'])
+
+        rec_result = subprocess.Popen(
             [venv_python, 'strategy_recommender.py'],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=900,  # 15 minutes timeout
             cwd=os.getcwd()
         )
 
-        if rec_result.returncode != 0:
-            return jsonify({
-                'success': False,
-                'error': 'Recommendation generation failed',
-                'stderr': rec_result.stderr[:1000]
-            }), 500
+        # Read recommender output
+        for line in rec_result.stdout:
+            line = line.strip()
+            if line and not line.startswith('/'):
+                if 'Progress:' in line or 'Found' in line or 'Saved' in line or '===' in line:
+                    update_status['progress'].append(line)
 
-        return jsonify({
-            'success': True,
-            'message': 'Data updated and recommendations generated successfully',
-            'update_output': result.stdout[-500:] if result.stdout else '',
-            'rec_output': rec_result.stdout[-500:] if rec_result.stdout else ''
-        })
-    except subprocess.TimeoutExpired as e:
-        return jsonify({
-            'error': 'Update timed out (process took too long)',
-            'details': str(e)
-        }), 500
+        rec_result.wait()
+
+        if rec_result.returncode != 0:
+            update_status['error'] = 'Recommendation generation failed'
+            update_status['running'] = False
+            return
+
+        update_status['progress'].append('✓ Recommendations generated successfully')
+        update_status['current_step'] = 'Complete!'
+        update_status['running'] = False
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        update_status['error'] = str(e)
+        update_status['running'] = False
+
+@app.route('/api/update', methods=['POST'])
+def update_data():
+    """Start data update in background"""
+    global update_status
+
+    if update_status['running']:
+        return jsonify({
+            'success': False,
+            'error': 'Update already in progress'
+        }), 400
+
+    # Reset status
+    update_status = {
+        'running': True,
+        'progress': ['Starting update...'],
+        'current_step': 'Initializing...',
+        'error': None
+    }
+
+    # Start background thread
+    thread = threading.Thread(target=run_update_background)
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({
+        'success': True,
+        'message': 'Update started in background'
+    })
+
+@app.route('/api/update/status', methods=['GET'])
+def update_progress():
+    """Get current update progress"""
+    global update_status
+    return jsonify({
+        'running': update_status['running'],
+        'progress': update_status['progress'][-50:],  # Last 50 lines
+        'current_step': update_status['current_step'],
+        'error': update_status['error']
+    })
 
 if __name__ == '__main__':
     print('=' * 70)
