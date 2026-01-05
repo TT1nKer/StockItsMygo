@@ -408,10 +408,10 @@ def update_data():
         # Get the virtual environment python path
         venv_python = os.path.join(os.getcwd(), 'venv', 'bin', 'python')
 
-        # Run update script
+        # Run update script (with --yes to skip confirmation prompt)
         print("Starting data update (last 5 days)...")
         result = subprocess.run(
-            [venv_python, 'tools/update_recent_data.py', '--days', '5'],
+            [venv_python, 'tools/update_recent_data.py', '--days', '5', '--yes'],
             capture_output=True,
             text=True,
             timeout=600,

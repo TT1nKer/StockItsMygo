@@ -22,7 +22,7 @@ import time
 import argparse
 
 
-def update_recent_data(days_back=10, batch_size=200, workers=10):
+def update_recent_data(days_back=10, batch_size=200, workers=10, auto_confirm=False):
     """
     Incrementally update recent price data
 
@@ -30,6 +30,7 @@ def update_recent_data(days_back=10, batch_size=200, workers=10):
         days_back: How many days to look back (default 10)
         batch_size: Stocks per batch
         workers: Concurrent downloads
+        auto_confirm: Skip confirmation prompt (for automated runs)
     """
     db = StockDB()
 
@@ -81,11 +82,14 @@ def update_recent_data(days_back=10, batch_size=200, workers=10):
     print(f"Workers: {workers}")
     print()
 
-    # Confirm
-    response = input("Start incremental update? (yes/no): ").strip().lower()
-    if response != 'yes':
-        print("Update cancelled.")
-        return
+    # Confirm (skip if auto_confirm=True)
+    if not auto_confirm:
+        response = input("Start incremental update? (yes/no): ").strip().lower()
+        if response != 'yes':
+            print("Update cancelled.")
+            return
+    else:
+        print("Auto-confirmed: Starting update...")
 
     print()
     print("=" * 80)
@@ -166,13 +170,16 @@ def main():
                        help='Batch size (default: 200)')
     parser.add_argument('--workers', type=int, default=10,
                        help='Concurrent workers (default: 10)')
+    parser.add_argument('--yes', '-y', action='store_true',
+                       help='Auto-confirm (skip confirmation prompt)')
 
     args = parser.parse_args()
 
     update_recent_data(
         days_back=args.days,
         batch_size=args.batch,
-        workers=args.workers
+        workers=args.workers,
+        auto_confirm=args.yes
     )
 
 
