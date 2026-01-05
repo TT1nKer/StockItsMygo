@@ -397,6 +397,62 @@
             cursor: pointer;
             border: none;
         }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #16181c;
+            border: 2px solid #00ba7c;
+            border-radius: 8px;
+            padding: 15px 20px;
+            color: #e7e9ea;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            animation: slideIn 0.3s ease-out;
+            max-width: 400px;
+        }
+
+        .toast.error {
+            border-color: #f4212e;
+        }
+
+        .toast.warning {
+            border-color: #ffa500;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .toast.hiding {
+            animation: slideOut 0.3s ease-in forwards;
+        }
+
+        .toast-icon {
+            display: inline-block;
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
     </style>
 </head>
 <body>
@@ -808,6 +864,26 @@
             // Update tab content
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(tabName + '-content').classList.add('active');
+
+            // Save current tab to localStorage
+            localStorage.setItem('activeTab', tabName);
+        }
+
+        // Show toast notification (no need to click OK)
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+
+            const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '⚠';
+            toast.innerHTML = `<span class="toast-icon">${icon}</span>${message}`;
+
+            document.body.appendChild(toast);
+
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('hiding');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
         // Current filter settings
@@ -1022,21 +1098,20 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert(`✓ ${symbol} added to your 14-day watchlist!`);
+                    showToast(`${symbol} added to your 14-day watchlist!`, 'success');
+                    // Auto refresh watchlist (no page reload needed)
                     loadWatchlist();
                 } else {
-                    alert(`Error: ${data.error}`);
+                    showToast(`Error: ${data.error}`, 'error');
                 }
             } catch (error) {
                 console.error('Error adding to watchlist:', error);
-                alert('Error adding stock to watchlist');
+                showToast('Error adding stock to watchlist', 'error');
             }
         }
 
         // Remove from watchlist
         async function removeFromWatchlist(symbol) {
-            if (!confirm(`Remove ${symbol} from watchlist?`)) return;
-
             try {
                 const response = await fetch(`/api/watchlist/remove/${symbol}`, {
                     method: 'DELETE'
@@ -1045,14 +1120,15 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert(`✓ ${symbol} removed from watchlist`);
+                    showToast(`${symbol} removed from watchlist`, 'success');
+                    // Auto refresh watchlist (no page reload needed)
                     loadWatchlist();
                 } else {
-                    alert(`Error: ${data.error}`);
+                    showToast(`Error: ${data.error}`, 'error');
                 }
             } catch (error) {
                 console.error('Error removing from watchlist:', error);
-                alert('Error removing stock from watchlist');
+                showToast('Error removing stock from watchlist', 'error');
             }
         }
 
@@ -1102,13 +1178,15 @@
                     clearInterval(progressInterval);
 
                     if (status.error) {
-                        alert(`Update failed: ${status.error}`);
+                        showToast(`Update failed: ${status.error}`, 'error');
+                        hideProgressModal();
                     } else {
                         setTimeout(() => {
                             hideProgressModal();
                             loadRecommendations();
                             loadStats();
-                            alert('✓ Update completed successfully!');
+                            loadWatchlist();  // Also refresh watchlist
+                            showToast('Update completed successfully!', 'success');
                         }, 2000);
                     }
 
@@ -1160,11 +1238,42 @@
 
         // Load data on page load
         window.addEventListener('load', () => {
+            // Restore last active tab
+            const savedTab = localStorage.getItem('activeTab');
+            if (savedTab) {
+                // Restore tab buttons
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.remove('active');
+                    if (tab.textContent.includes(getTabLabel(savedTab))) {
+                        tab.classList.add('active');
+                    }
+                });
+                // Restore tab content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                const savedContent = document.getElementById(savedTab + '-content');
+                if (savedContent) {
+                    savedContent.classList.add('active');
+                }
+            }
+
             loadStats();
             loadRecommendations();
             loadWatchlist();
             loadTopMovers();
         });
+
+        // Helper function to get tab label
+        function getTabLabel(tabName) {
+            const labels = {
+                'recommendations': 'Daily Picks',
+                'watchlist': 'Watchlist',
+                'gainers': 'Gainers',
+                'losers': 'Losers'
+            };
+            return labels[tabName] || '';
+        }
     </script>
 </body>
 </html>
