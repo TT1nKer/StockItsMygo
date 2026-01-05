@@ -420,10 +420,11 @@ def run_update_background():
         update_status['progress'].append(update_status['current_step'])
 
         result = subprocess.Popen(
-            [venv_python, 'tools/update_recent_data.py', '--days', '5', '--yes'],
+            [venv_python, '-u', 'tools/update_recent_data.py', '--days', '5', '--yes'],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            bufsize=1,  # Line buffered
             cwd=os.getcwd()
         )
 
@@ -431,7 +432,7 @@ def run_update_background():
         for line in result.stdout:
             line = line.strip()
             if line and not line.startswith('/'):  # Filter out file paths and warnings
-                if 'Batch' in line or 'SUCCESS' in line or 'Progress:' in line or 'stocks' in line:
+                if 'Batch' in line or 'SUCCESS' in line or 'Progress:' in line or 'stocks' in line or 'Total' in line:
                     update_status['progress'].append(line)
 
         result.wait()
@@ -448,10 +449,11 @@ def run_update_background():
         update_status['progress'].append(update_status['current_step'])
 
         rec_result = subprocess.Popen(
-            [venv_python, 'strategy_recommender.py'],
+            [venv_python, '-u', 'strategy_recommender.py'],  # -u for unbuffered output
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            bufsize=1,  # Line buffered
             cwd=os.getcwd()
         )
 
@@ -459,7 +461,7 @@ def run_update_background():
         for line in rec_result.stdout:
             line = line.strip()
             if line and not line.startswith('/'):
-                if 'Progress:' in line or 'Found' in line or 'Saved' in line or '===' in line:
+                if 'Progress:' in line or 'Found' in line or 'Saved' in line or '===' in line or 'Analyzing' in line or 'Total stocks' in line:
                     update_status['progress'].append(line)
 
         rec_result.wait()

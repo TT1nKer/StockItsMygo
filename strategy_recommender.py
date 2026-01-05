@@ -165,15 +165,15 @@ class StockRecommender:
 
     def get_daily_recommendations(self, min_score=30):
         """Get all daily recommendations above minimum score threshold"""
-        print("Analyzing stocks for daily recommendations...")
+        print("Analyzing stocks for daily recommendations...", flush=True)
 
         stocks = self.db.get_stock_list()
-        print(f"Total stocks to analyze: {len(stocks)}")
+        print(f"Total stocks to analyze: {len(stocks)}", flush=True)
 
         results = []
         for i, symbol in enumerate(stocks):
             if (i + 1) % 100 == 0:
-                print(f"Progress: {i+1}/{len(stocks)}")
+                print(f"Progress: {i+1}/{len(stocks)}", flush=True)
 
             analysis = self.analyze_stock(symbol)
             if analysis and analysis['score'] >= min_score:
@@ -182,7 +182,7 @@ class StockRecommender:
         # Sort by score
         results.sort(key=lambda x: x['score'], reverse=True)
 
-        print(f"\nFound {len(results)} stocks with score >= {min_score}")
+        print(f"\nFound {len(results)} stocks with score >= {min_score}", flush=True)
 
         return results
 
@@ -258,7 +258,7 @@ class StockRecommender:
         conn.commit()
         conn.close()
 
-        print(f"✓ Saved {len(recommendations)} recommendations to database")
+        print(f"✓ Saved {len(recommendations)} recommendations to database", flush=True)
 
 if __name__ == '__main__':
     recommender = StockRecommender()
