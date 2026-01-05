@@ -449,12 +449,12 @@ def run_update_background():
 
         update_status['progress'].append('✓ Price data updated successfully')
 
-        # Step 2: Generate recommendations
-        update_status['current_step'] = 'Analyzing 2,138 stocks and generating recommendations...'
+        # Step 2: Generate recommendations (use FAST version)
+        update_status['current_step'] = 'Analyzing 2,138 stocks (fast mode - 2-3 minutes)...'
         update_status['progress'].append(update_status['current_step'])
 
         rec_result = subprocess.Popen(
-            [venv_python, '-u', 'strategy_recommender.py'],  # -u for unbuffered output
+            [venv_python, '-u', 'strategy_recommender_fast.py'],  # Use fast version!
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

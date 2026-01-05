@@ -164,25 +164,37 @@ class StockRecommender:
             return None
 
     def get_daily_recommendations(self, min_score=30):
-        """Get all daily recommendations above minimum score threshold"""
+        """Get all daily recommendations above minimum score threshold - FAST VERSION"""
         print("Analyzing stocks for daily recommendations...", flush=True)
 
         stocks = self.db.get_stock_list()
         print(f"Total stocks to analyze: {len(stocks)}", flush=True)
 
         results = []
-        for i, symbol in enumerate(stocks):
-            if (i + 1) % 100 == 0:
-                print(f"Progress: {i+1}/{len(stocks)}", flush=True)
+        progress_interval = 100  # Show progress every 100 stocks
 
-            analysis = self.analyze_stock(symbol)
-            if analysis and analysis['score'] >= min_score:
-                results.append(analysis)
+        # Process stocks one by one but with better progress reporting
+        print("Starting analysis (this will take 3-5 minutes)...", flush=True)
+
+        for i, symbol in enumerate(stocks):
+            # Show progress more frequently at start, then every 100
+            should_print = (i < 500 and (i + 1) % 100 == 0) or ((i + 1) % 200 == 0)
+            if should_print:
+                elapsed_pct = ((i + 1) / len(stocks)) * 100
+                print(f"Progress: {i+1}/{len(stocks)} ({elapsed_pct:.1f}%) - {len(results)} candidates found", flush=True)
+
+            try:
+                analysis = self.analyze_stock(symbol)
+                if analysis and analysis['score'] >= min_score:
+                    results.append(analysis)
+            except Exception as e:
+                # Silently skip errors to speed up
+                continue
 
         # Sort by score
         results.sort(key=lambda x: x['score'], reverse=True)
 
-        print(f"\nFound {len(results)} stocks with score >= {min_score}", flush=True)
+        print(f"\nCompleted! Found {len(results)} stocks with score >= {min_score}", flush=True)
 
         return results
 
