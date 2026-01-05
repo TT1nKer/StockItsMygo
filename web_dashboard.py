@@ -283,6 +283,7 @@ def get_user_watchlist():
     """Get user's personal watchlist"""
     try:
         import psycopg2
+        from datetime import datetime
 
         conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
         cursor = conn.cursor()
@@ -306,10 +307,14 @@ def get_user_watchlist():
                 previous = history.iloc[-2]
                 added_price = None
 
-                # Get price at add date
-                added_row = history[history['date'] == str(added_date)]
+                # Get price at add date (convert both to string for comparison)
+                history['date_str'] = history['date'].astype(str)
+                added_row = history[history['date_str'] == str(added_date)]
                 if len(added_row) > 0:
                     added_price = float(added_row.iloc[0]['close'])
+                else:
+                    # If exact date not found, use latest price as fallback
+                    added_price = float(latest['close'])
 
                 change_pct = ((latest['close'] - previous['close']) / previous['close']) * 100
                 change_since_add = ((latest['close'] - added_price) / added_price * 100) if added_price else 0
