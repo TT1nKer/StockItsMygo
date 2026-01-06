@@ -30,6 +30,7 @@
             padding: 30px 0;
             margin-bottom: 30px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            position: relative;
         }
 
         h1 {
@@ -37,6 +38,37 @@
             font-size: 2.5em;
             color: white;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .user-info {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: white;
+        }
+
+        .username {
+            font-size: 1em;
+            font-weight: 500;
+        }
+
+        .btn-logout {
+            padding: 8px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            color: white;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
         }
 
         .stats-grid {
@@ -138,6 +170,65 @@
 
         .negative {
             color: #f4212e;
+        }
+
+        /* Position Type Badges */
+        .position-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .position-long {
+            background: #00ba7c;
+            color: white;
+        }
+
+        .position-short {
+            background: #f4212e;
+            color: white;
+        }
+
+        .position-watch {
+            background: #1d9bf0;
+            color: white;
+        }
+
+        .position-wishlist {
+            background: #ffa500;
+            color: white;
+        }
+
+        /* Position Filter Buttons */
+        .position-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .position-filter-btn {
+            padding: 8px 16px;
+            border: 2px solid #38444d;
+            background: transparent;
+            color: #e7e9ea;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .position-filter-btn:hover {
+            background: #1d9bf0;
+            border-color: #1d9bf0;
+        }
+
+        .position-filter-btn.active {
+            background: #1d9bf0;
+            border-color: #1d9bf0;
         }
 
         .links {
@@ -459,6 +550,10 @@
     <header>
         <div class="container">
             <h1>📈 Stock Analysis Dashboard</h1>
+            <div class="user-info">
+                <span class="username">Welcome, {{ username }}!</span>
+                <button onclick="logout()" class="btn-logout">Logout</button>
+            </div>
         </div>
     </header>
 
@@ -529,6 +624,47 @@
             </div>
         </div>
 
+        <!-- Position Type Selection Modal -->
+        <div id="positionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+            <div style="background: #16181c; border: 2px solid #38444d; border-radius: 12px; padding: 30px; max-width: 500px; width: 90%;">
+                <h2 style="color: #1d9bf0; margin: 0 0 20px 0; font-size: 1.5em;">
+                    Add <span id="modalSymbol"></span> to Watchlist
+                </h2>
+
+                <p style="color: #8b98a5; margin-bottom: 20px;">Choose your position type:</p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+                    <button class="position-select-btn" onclick="selectPosition('long')" style="padding: 20px; border: 2px solid #00ba7c; background: transparent; color: #e7e9ea; border-radius: 12px; cursor: pointer; transition: all 0.3s; font-size: 1.1em; font-weight: bold;">
+                        <div style="font-size: 2em; margin-bottom: 8px;">📈</div>
+                        <div>Long</div>
+                        <div style="font-size: 0.8em; color: #8b98a5; margin-top: 5px;">Expecting price to go up</div>
+                    </button>
+
+                    <button class="position-select-btn" onclick="selectPosition('short')" style="padding: 20px; border: 2px solid #f4212e; background: transparent; color: #e7e9ea; border-radius: 12px; cursor: pointer; transition: all 0.3s; font-size: 1.1em; font-weight: bold;">
+                        <div style="font-size: 2em; margin-bottom: 8px;">📉</div>
+                        <div>Short</div>
+                        <div style="font-size: 0.8em; color: #8b98a5; margin-top: 5px;">Expecting price to go down</div>
+                    </button>
+
+                    <button class="position-select-btn" onclick="selectPosition('watch')" style="padding: 20px; border: 2px solid #1d9bf0; background: transparent; color: #e7e9ea; border-radius: 12px; cursor: pointer; transition: all 0.3s; font-size: 1.1em; font-weight: bold;">
+                        <div style="font-size: 2em; margin-bottom: 8px;">👁️</div>
+                        <div>Watch</div>
+                        <div style="font-size: 0.8em; color: #8b98a5; margin-top: 5px;">Just monitoring</div>
+                    </button>
+
+                    <button class="position-select-btn" onclick="selectPosition('wishlist')" style="padding: 20px; border: 2px solid #ffa500; background: transparent; color: #e7e9ea; border-radius: 12px; cursor: pointer; transition: all 0.3s; font-size: 1.1em; font-weight: bold;">
+                        <div style="font-size: 2em; margin-bottom: 8px;">⭐</div>
+                        <div>Wishlist</div>
+                        <div style="font-size: 0.8em; color: #8b98a5; margin-top: 5px;">Want to buy later</div>
+                    </button>
+                </div>
+
+                <button onclick="closePositionModal()" style="width: 100%; padding: 12px; background: #38444d; color: #e7e9ea; border: none; border-radius: 8px; cursor: pointer; font-size: 1em;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+
         <!-- Tabs -->
         <div class="tabs">
             <button class="tab active" onclick="switchTab('recommendations')">📊 Daily Picks</button>
@@ -588,6 +724,26 @@
                 <p style="color: #8b98a5; margin-bottom: 20px;">
                     Track stocks you're monitoring for 14 days. Click "Add to Watchlist" on any stock to start tracking.
                 </p>
+
+                <!-- Position Type Filters -->
+                <div class="position-filters">
+                    <button class="position-filter-btn active" onclick="filterWatchlistByPosition('all')">
+                        All Positions
+                    </button>
+                    <button class="position-filter-btn" onclick="filterWatchlistByPosition('long')">
+                        📈 Long Only
+                    </button>
+                    <button class="position-filter-btn" onclick="filterWatchlistByPosition('short')">
+                        📉 Short Only
+                    </button>
+                    <button class="position-filter-btn" onclick="filterWatchlistByPosition('watch')">
+                        👁️ Watch Only
+                    </button>
+                    <button class="position-filter-btn" onclick="filterWatchlistByPosition('wishlist')">
+                        ⭐ Wishlist Only
+                    </button>
+                </div>
+
                 <div id="watchlistTable" class="loading">Loading...</div>
             </div>
         </div>
@@ -1012,6 +1168,9 @@
         }
 
         // Load user watchlist
+        let allWatchlistStocks = [];
+        let currentPositionFilter = 'all';
+
         async function loadWatchlist() {
             try {
                 const response = await fetch('/api/watchlist');
@@ -1025,13 +1184,45 @@
                     return;
                 }
 
-                displayWatchlistTable(data);
+                allWatchlistStocks = data;
+                applyWatchlistFilter();
             } catch (error) {
                 console.error('Error loading watchlist:', error);
                 document.getElementById('watchlistTable').innerHTML = `
                     <p class="loading">Error loading watchlist: ${error.message}</p>
                 `;
             }
+        }
+
+        function filterWatchlistByPosition(positionType) {
+            currentPositionFilter = positionType;
+
+            // Update active button
+            document.querySelectorAll('.position-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            applyWatchlistFilter();
+        }
+
+        function applyWatchlistFilter() {
+            let filtered = allWatchlistStocks;
+
+            if (currentPositionFilter !== 'all') {
+                filtered = allWatchlistStocks.filter(stock =>
+                    stock.position_type === currentPositionFilter
+                );
+            }
+
+            if (filtered.length === 0) {
+                document.getElementById('watchlistTable').innerHTML = `
+                    <p class="loading">No ${currentPositionFilter === 'all' ? '' : currentPositionFilter} positions in your watchlist.</p>
+                `;
+                return;
+            }
+
+            displayWatchlistTable(filtered);
         }
 
         // Display watchlist table
@@ -1043,6 +1234,7 @@
                     <thead>
                         <tr>
                             <th>Symbol</th>
+                            <th>Position</th>
                             <th>Current Price</th>
                             <th>Added Price</th>
                             <th>Change Since Add</th>
@@ -1060,9 +1252,19 @@
                 const daysLeft = stock.days_remaining || 0;
                 const daysColor = daysLeft <= 3 ? '#f4212e' : daysLeft <= 7 ? '#ffa500' : '#00ba7c';
 
+                // Position type badge
+                const positionType = stock.position_type || 'watch';
+                const positionLabel = {
+                    'long': '📈 Long',
+                    'short': '📉 Short',
+                    'watch': '👁️ Watch',
+                    'wishlist': '⭐ Wishlist'
+                }[positionType];
+
                 html += `
                     <tr>
                         <td><span class="stock-symbol" onclick="showStockDetail('${stock.symbol}')">${stock.symbol}</span></td>
+                        <td><span class="position-badge position-${positionType}">${positionLabel}</span></td>
                         <td>$${stock.price.toFixed(2)}</td>
                         <td>$${stock.added_price ? stock.added_price.toFixed(2) : 'N/A'}</td>
                         <td class="${changeClass}">
@@ -1082,25 +1284,48 @@
             container.innerHTML = html;
         }
 
-        // Add to watchlist
+        // Add to watchlist - show position selection modal
+        let currentSymbolToAdd = null;
+
         async function addToWatchlist(symbol) {
+            currentSymbolToAdd = symbol;
+            document.getElementById('modalSymbol').textContent = symbol;
+            document.getElementById('positionModal').style.display = 'flex';
+        }
+
+        function closePositionModal() {
+            document.getElementById('positionModal').style.display = 'none';
+            currentSymbolToAdd = null;
+        }
+
+        async function selectPosition(positionType) {
+            if (!currentSymbolToAdd) return;
+
             try {
                 const response = await fetch('/api/watchlist/add', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        symbol: symbol,
+                        symbol: currentSymbolToAdd,
                         days: 14,
-                        notes: 'Added from daily picks'
+                        notes: 'Added from daily picks',
+                        position_type: positionType
                     })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    showToast(`${symbol} added to your 14-day watchlist!`, 'success');
+                    const positionLabels = {
+                        'long': '📈 Long',
+                        'short': '📉 Short',
+                        'watch': '👁️ Watch',
+                        'wishlist': '⭐ Wishlist'
+                    };
+                    showToast(`${currentSymbolToAdd} added as ${positionLabels[positionType]}!`, 'success');
                     // Auto refresh watchlist (no page reload needed)
                     loadWatchlist();
+                    closePositionModal();
                 } else {
                     showToast(`Error: ${data.error}`, 'error');
                 }
@@ -1273,6 +1498,21 @@
                 'losers': 'Losers'
             };
             return labels[tabName] || '';
+        }
+
+        // Logout function
+        function logout() {
+            window.location.href = '/logout';
+        }
+
+        // Check for 401 errors in fetch responses (indicates session expired)
+        async function handleFetchResponse(response) {
+            if (response.status === 401) {
+                // Session expired - redirect to login
+                window.location.href = '/login';
+                return null;
+            }
+            return response;
         }
     </script>
 </body>

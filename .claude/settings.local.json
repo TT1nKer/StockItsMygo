@@ -29,7 +29,25 @@
       "Bash(docker-compose:*)",
       "Bash(open:*)",
       "Bash(python db/init_db_postgres.py:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(kill:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)",
+      "Bash(source:*)",
+      "Bash(pkill:*)",
+      "Bash(timeout 120 python:*)",
+      "Bash(tee:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Add --yes flag to skip confirmation prompt in update script\n\nISSUE: Update button was failing with \"Data update failed\" error\nROOT CAUSE: update_recent_data.py had interactive input\\(\\) prompt\n- When run from web dashboard via subprocess, no stdin available\n- Caused EOFError: \"EOF when reading a line\"\n- Update endpoint returned 500 error\n\nSOLUTION:\n1. tools/update_recent_data.py:\n   - Added auto_confirm parameter to update_recent_data\\(\\)\n   - Added --yes/-y command line flag\n   - Skip confirmation prompt when auto_confirm=True\n   - Print \"Auto-confirmed: Starting update...\" instead\n\n2. web_dashboard.py:\n   - Updated /api/update endpoint to pass --yes flag\n   - Changed: [''python'', ''tools/update_recent_data.py'', ''--days'', ''5'']\n   - To: [venv_python, ''tools/update_recent_data.py'', ''--days'', ''5'', ''--yes'']\n\nTESTING:\n✓ Manual test: python tools/update_recent_data.py --days 5 --yes\n✓ Successfully bypasses confirmation prompt\n✓ Begins downloading data immediately\n✓ Works in automated/subprocess contexts\n\nBENEFITS:\n- Update button in web dashboard now functional\n- No user interaction needed for scheduled/automated updates\n- Backward compatible \\(still prompts without --yes flag\\)\n- Safer for background processes\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(timeout 60 python:*)",
+      "Bash(ls:*)",
+      "Bash(psql:*)",
+      "Bash(/Users/hostsjim/StockItsMygo/venv/bin/python -c \"import psycopg2; conn = psycopg2.connect\\(''host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password''\\); cursor = conn.cursor\\(\\); cursor.execute\\(\"\"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = ''user_watchlist'' ORDER BY ordinal_position\"\"\\); print\\(''\\\\n''.join\\([f''{row[0]}: {row[1]} \\({\"\"NULL\"\" if row[2] == \"\"YES\"\" else \"\"NOT NULL\"\"}\\)'' for row in cursor.fetchall\\(\\)]\\)\\)\")",
+      "Bash(/Users/hostsjim/StockItsMygo/venv/bin/pip list)",
+      "Bash(mkdir:*)",
+      "Bash(__NEW_LINE__ echo -e \"\\\\n=== User B watchlist ===\")",
+      "Bash(PGPASSWORD=stock_password psql:*)",
+      "Bash(docker ps:*)",
+      "Bash(done)"
     ]
   }
 }

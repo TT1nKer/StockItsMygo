@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Stock Analysis Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f1419;
+            color: #e7e9ea;
+            line-height: 1.6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: #16181c;
+            border: 1px solid #38444d;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            max-width: 450px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2em;
+            color: #1d9bf0;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .subtitle {
+            color: #8b98a5;
+            font-size: 0.9em;
+            margin-top: 8px;
+        }
+
+        .form-container {
+            margin-top: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #8b98a5;
+            font-size: 0.95em;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 1em;
+            border: 2px solid #38444d;
+            border-radius: 8px;
+            background: #0f1419;
+            color: #e7e9ea;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: #1d9bf0;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1d9bf0 0%, #0084b4 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(29, 155, 240, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            text-align: center;
+        }
+
+        .message.error {
+            background: rgba(244, 33, 46, 0.1);
+            border: 1px solid #f4212e;
+            color: #f4212e;
+        }
+
+        .message.success {
+            background: rgba(0, 186, 124, 0.1);
+            border: 1px solid #00ba7c;
+            color: #00ba7c;
+        }
+
+        .toggle-form {
+            text-align: center;
+            margin-top: 25px;
+            color: #8b98a5;
+        }
+
+        .toggle-link {
+            color: #1d9bf0;
+            text-decoration: none;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .toggle-link:hover {
+            text-decoration: underline;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .divider {
+            margin: 25px 0;
+            text-align: center;
+            position: relative;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #38444d;
+        }
+
+        .divider span {
+            background: #16181c;
+            padding: 0 15px;
+            position: relative;
+            color: #8b98a5;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 500px) {
+            .login-container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 1.7em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>📈 Stock Dashboard</h1>
+            <p class="subtitle">AI-Powered Stock Recommendations</p>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-form-container" class="form-container">
+            <div id="login-message" class="message"></div>
+
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="login-username">Username</label>
+                    <input type="text" id="login-username" required autocomplete="username">
+                </div>
+
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+
+            <div class="toggle-form">
+                New user? <a class="toggle-link" onclick="showRegisterForm()">Register here</a>
+            </div>
+        </div>
+
+        <!-- Registration Form -->
+        <div id="register-form-container" class="form-container hidden">
+            <div id="register-message" class="message"></div>
+
+            <form id="register-form" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label for="reg-username">Username</label>
+                    <input type="text" id="reg-username" required autocomplete="username" minlength="3" maxlength="50">
+                </div>
+
+                <div class="form-group">
+                    <label for="reg-password">Password</label>
+                    <input type="password" id="reg-password" required autocomplete="new-password" minlength="8">
+                    <small style="color: #8b98a5; font-size: 0.85em; margin-top: 4px; display: block;">
+                        Minimum 8 characters
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="invitation-code">Invitation Code</label>
+                    <input type="text" id="invitation-code" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Register</button>
+            </form>
+
+            <div class="toggle-form">
+                Already have an account? <a class="toggle-link" onclick="showLoginForm()">Login here</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ======================================================================
+        // Form Switching
+        // ======================================================================
+
+        function showRegisterForm() {
+            document.getElementById('login-form-container').classList.add('hidden');
+            document.getElementById('register-form-container').classList.remove('hidden');
+            clearMessages();
+        }
+
+        function showLoginForm() {
+            document.getElementById('register-form-container').classList.add('hidden');
+            document.getElementById('login-form-container').classList.remove('hidden');
+            clearMessages();
+        }
+
+        function clearMessages() {
+            document.getElementById('login-message').style.display = 'none';
+            document.getElementById('register-message').style.display = 'none';
+        }
+
+        // ======================================================================
+        // Message Display
+        // ======================================================================
+
+        function showError(containerId, message) {
+            const el = document.getElementById(containerId);
+            el.textContent = message;
+            el.className = 'message error';
+            el.style.display = 'block';
+        }
+
+        function showSuccess(containerId, message) {
+            const el = document.getElementById(containerId);
+            el.textContent = message;
+            el.className = 'message success';
+            el.style.display = 'block';
+        }
+
+        // ======================================================================
+        // Login Handler
+        // ======================================================================
+
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            if (!username || !password) {
+                showError('login-message', 'Please enter both username and password');
+                return;
+            }
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Success - redirect to dashboard
+                    window.location.href = data.redirect;
+                } else {
+                    // Show error message
+                    showError('login-message', data.error || 'Login failed');
+                }
+            } catch (error) {
+                showError('login-message', 'Network error. Please try again.');
+                console.error('Login error:', error);
+            }
+        }
+
+        // ======================================================================
+        // Registration Handler
+        // ======================================================================
+
+        async function handleRegister(event) {
+            event.preventDefault();
+
+            const username = document.getElementById('reg-username').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const invitation_code = document.getElementById('invitation-code').value.trim();
+
+            // Client-side validation
+            if (username.length < 3) {
+                showError('register-message', 'Username must be at least 3 characters');
+                return;
+            }
+
+            if (password.length < 8) {
+                showError('register-message', 'Password must be at least 8 characters');
+                return;
+            }
+
+            if (!invitation_code) {
+                showError('register-message', 'Invitation code is required');
+                return;
+            }
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password, invitation_code })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Success - show message and switch to login
+                    showSuccess('register-message', 'Registration successful! Redirecting to login...');
+
+                    // Wait 2 seconds then switch to login form
+                    setTimeout(() => {
+                        showLoginForm();
+                        // Pre-fill username in login form
+                        document.getElementById('login-username').value = username;
+                        showSuccess('login-message', 'Registration successful! Please login.');
+                    }, 2000);
+                } else {
+                    // Show error message
+                    showError('register-message', data.error || 'Registration failed');
+                }
+            } catch (error) {
+                showError('register-message', 'Network error. Please try again.');
+                console.error('Registration error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

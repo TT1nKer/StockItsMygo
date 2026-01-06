@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 from config.database import config
 from db.api import StockDB
 import pandas as pd
@@ -17,7 +17,16 @@ import plotly.utils
 import json
 import threading
 
+# Authentication imports
+from auth import (
+    login_required, get_current_user_id, get_current_username,
+    authenticate_user, register_user, is_logged_in
+)
+
 app = Flask(__name__)
+
+# Configure session (secret key for session encryption)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-key-CHANGE-IN-PRODUCTION-b8f3d2e1a9c4')
 
 # Global variable to track update progress
 update_status = {
@@ -44,8 +53,64 @@ def get_stock_links(symbol):
 
 @app.route('/')
 def index():
-    """Main dashboard page"""
-    return render_template('dashboard.html')
+    """Main dashboard page - requires login"""
+    if not is_logged_in():
+        return redirect(url_for('login'))
+    return render_template('dashboard.html', username=get_current_username())
+
+
+# ============================================================================
+# Authentication Routes
+# ============================================================================
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page and authentication handler"""
+    if request.method == 'POST':
+        data = request.json
+        username = data.get('username')
+        password = data.get('password')
+
+        success, message, user_id = authenticate_user(username, password)
+
+        if success:
+            # Create session
+            session['user_id'] = user_id
+            session['username'] = username
+            return jsonify({'success': True, 'redirect': '/'})
+        else:
+            return jsonify({'success': False, 'error': message}), 401
+
+    # GET request - show login page
+    return render_template('login.html')
+
+
+@app.route('/register', methods=['POST'])
+def register():
+    """User registration endpoint"""
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    invitation_code = data.get('invitation_code')
+
+    success, message, user_id = register_user(username, password, invitation_code)
+
+    if success:
+        return jsonify({'success': True, 'message': message})
+    else:
+        return jsonify({'success': False, 'error': message}), 400
+
+
+@app.route('/logout')
+def logout():
+    """Logout and clear session"""
+    session.clear()
+    return redirect(url_for('login'))
+
+
+# ============================================================================
+# Public API Routes (no login required)
+# ============================================================================
 
 @app.route('/api/stats')
 def get_stats():
@@ -279,26 +344,28 @@ def get_daily_recommendations():
         return jsonify({'error': str(e), 'recommendations': [], 'counts': {}}), 500
 
 @app.route('/api/watchlist')
+@login_required
 def get_user_watchlist():
     """Get user's personal watchlist"""
     try:
         import psycopg2
         from datetime import datetime
 
+        user_id = get_current_user_id()
         conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
         cursor = conn.cursor()
 
-        # Get watchlist stocks
+        # Get watchlist stocks for current user only
         cursor.execute("""
-            SELECT symbol, added_date, target_date, notes
+            SELECT symbol, added_date, target_date, notes, position_type
             FROM user_watchlist
-            WHERE is_active = true
+            WHERE is_active = true AND user_id = %s
             ORDER BY added_date DESC
-        """)
+        """, (user_id,))
 
         watchlist = []
         for row in cursor.fetchall():
-            symbol, added_date, target_date, notes = row
+            symbol, added_date, target_date, notes, position_type = row
 
             # Get latest price
             history = db.get_price_history(symbol)
@@ -329,6 +396,7 @@ def get_user_watchlist():
                     'target_date': str(target_date) if target_date else None,
                     'days_remaining': (target_date - datetime.now().date()).days if target_date else None,
                     'notes': notes,
+                    'position_type': position_type,
                     'volume': int(latest['volume']),
                     'links': get_stock_links(symbol)
                 })
@@ -339,16 +407,24 @@ def get_user_watchlist():
         return jsonify({'error': str(e), 'watchlist': []}), 500
 
 @app.route('/api/watchlist/add', methods=['POST'])
+@login_required
 def add_to_watchlist():
     """Add stock to watchlist"""
     try:
         import psycopg2
         from datetime import datetime, timedelta
 
+        user_id = get_current_user_id()
         data = request.json
         symbol = data.get('symbol')
         notes = data.get('notes', '')
         days = data.get('days', 14)
+        position_type = data.get('position_type', 'watch')
+
+        # Validate position_type
+        valid_types = ['long', 'short', 'watch', 'wishlist']
+        if position_type not in valid_types:
+            position_type = 'watch'
 
         if not symbol:
             return jsonify({'error': 'Symbol required'}), 400
@@ -356,32 +432,22 @@ def add_to_watchlist():
         conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
         cursor = conn.cursor()
 
-        # Create table if not exists
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_watchlist (
-                id SERIAL PRIMARY KEY,
-                symbol VARCHAR(20),
-                added_date DATE DEFAULT CURRENT_DATE,
-                target_date DATE,
-                notes TEXT,
-                is_active BOOLEAN DEFAULT true,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(symbol)
-            )
-        """)
+        # Note: table structure now includes user_id (added by migration)
+        # No longer creating table here - should already exist from migration
 
-        # Add to watchlist
+        # Add to watchlist for current user
         today = datetime.now().date()
         target = today + timedelta(days=days)
 
         cursor.execute("""
-            INSERT INTO user_watchlist (symbol, added_date, target_date, notes, is_active)
-            VALUES (%s, %s, %s, %s, true)
-            ON CONFLICT (symbol) DO UPDATE SET
+            INSERT INTO user_watchlist (user_id, symbol, added_date, target_date, notes, position_type, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, true)
+            ON CONFLICT (user_id, symbol) DO UPDATE SET
                 is_active = true,
                 target_date = EXCLUDED.target_date,
-                notes = EXCLUDED.notes
-        """, (symbol, today, target, notes))
+                notes = EXCLUDED.notes,
+                position_type = EXCLUDED.position_type
+        """, (user_id, symbol, today, target, notes, position_type))
 
         conn.commit()
         conn.close()
@@ -391,19 +457,21 @@ def add_to_watchlist():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/watchlist/remove/<symbol>', methods=['DELETE'])
+@login_required
 def remove_from_watchlist(symbol):
     """Remove stock from watchlist"""
     try:
         import psycopg2
 
+        user_id = get_current_user_id()
         conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
         cursor = conn.cursor()
 
         cursor.execute("""
             UPDATE user_watchlist
             SET is_active = false
-            WHERE symbol = %s
-        """, (symbol,))
+            WHERE symbol = %s AND user_id = %s
+        """, (symbol, user_id))
 
         conn.commit()
         conn.close()

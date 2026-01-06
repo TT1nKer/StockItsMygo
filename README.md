@@ -1,266 +1,255 @@
-# Strategy=Z 股票分析系统
+# 📈 StockItsMygo - AI 股票推荐系统
 
-完整的股票数据库系统，包含2,156只NASDAQ股票的历史数据、多策略分析和每日观察工作流程。
+> 智能股票分析与推荐系统，支持多用户、仓位管理、实时监控
 
-## 📊 项目概览
+![Status](https://img.shields.io/badge/status-active-success)
+![Python](https://img.shields.io/badge/python-3.x-blue)
+![Database](https://img.shields.io/badge/database-PostgreSQL%2013-316192)
 
-- **数据库大小**: 1.5 GB
-- **股票数量**: 2,156只 NASDAQ股票
-- **数据覆盖**: 100% 价格历史数据
-- **时间跨度**: 10-30年完整历史
-- **数据精度**: 日线 + 分钟级（观察列表）
-- **策略系统**: 3种内置策略 + 自定义框架
-- **工作模式**: 观察模式（交易前练习）
+---
+
+## ✨ 核心功能
+
+### 📊 AI 每日推荐
+- 基于技术分析的智能推荐算法
+- RSI、动量、成交量、突破等多维度分析
+- 可调节评分阈值，灵活过滤
+- **今日推荐**: 查看最新的股票推荐
+
+### 👁️ 智能 Watchlist
+- **4 种仓位类型**：
+  - 📈 **Long** - 看涨仓位
+  - 📉 **Short** - 看跌仓位
+  - 👁️ **Watch** - 观察模式
+  - ⭐ **Wishlist** - 愿望清单
+- 自动计算收益
+- 14 天监控期
+- 按仓位类型过滤
+
+### 🔐 多用户系统
+- 邀请码注册机制
+- 独立的用户 watchlist
+- 安全的密码哈希
+- Session 管理
+
+### 📈 实时数据
+- 2156 只股票
+- 940 万条历史价格数据
+- 一键更新最新数据
+- TimescaleDB 优化存储
+
+---
+
+## 🚀 快速开始
+
+### 1. 启动服务器
+
+```bash
+cd /Users/hostsjim/StockItsMygo
+source venv/bin/activate
+python web_dashboard.py
+```
+
+### 2. 访问系统
+
+**本地访问**:
+```
+http://localhost:8080
+```
+
+**朋友访问** (选择一种方式):
+- **局域网**: `http://192.168.x.x:8080` (同一 WiFi)
+- **端口转发**: `http://公网IP:8080` (有路由器控制权)
+- **Ngrok**: `https://xxx.ngrok.io` (无路由器控制权) ⭐ 推荐
+
+### 3. 登录
+
+**默认账号**:
+- 用户名: `admin`
+- 密码: `admin123`
+- ⚠️ 首次登录后请立即修改密码！
+
+**注册新用户**:
+- 点击 "New User? Register here"
+- 邀请码: `stocktest2026`
+
+---
+
+## 📚 完整文档
+
+### 🎯 新手指南
+- [完整部署指南](docs/deployment/DEPLOYMENT.md) - 从零开始部署
+- [网络配置](docs/setup/NETWORK.md) - 让朋友可以访问
+- [常见问题 FAQ](docs/setup/FAQ.md) - 疑难解答
+
+### ⚙️ 功能文档
+- [Watchlist 使用指南](docs/features/WATCHLIST.md) - 仓位管理详解
+- [用户认证](docs/setup/AUTHENTICATION.md) - 用户管理
+- [数据更新](docs/features/DATA_UPDATE.md) - 如何更新数据
+
+### 📖 完整文档导航
+👉 **[文档总目录](docs/MASTER_README.md)** 👈
+
+---
+
+## 💡 使用场景
+
+### 场景 1：日内交易者
+```
+1. 查看"每日推荐"，找到高分股票
+2. 添加看涨的股票为 📈 Long
+3. 添加看跌的股票为 📉 Short
+4. 用过滤器分别查看做多/做空仓位
+```
+
+### 场景 2：长期投资者
+```
+1. 发现有潜力的股票
+2. 添加到 ⭐ Wishlist 愿望清单
+3. 研究 1-2 周
+4. 决定后改为 📈 Long 并买入
+```
+
+### 场景 3：分享给朋友
+```
+1. 使用 Ngrok 获取公网地址
+2. 分享地址和邀请码给朋友
+3. 每个人有独立的 watchlist
+4. 一起研究和讨论股票
+```
+
+---
+
+## 🛠️ 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| **数据库** | PostgreSQL 13 + TimescaleDB |
+| **后端** | Python 3.x + Flask |
+| **前端** | HTML/CSS/JavaScript (原生) |
+| **图表** | Plotly.js |
+| **认证** | Flask Session + Werkzeug Security |
+| **数据** | yfinance + pandas |
+
+---
+
+## 📊 数据统计
+
+```
+📈 2,156 只股票
+💾 9.4M 条价格记录
+⏱️ 每日推荐生成：~5-10 分钟
+👥 支持多用户（10-20 人）
+```
+
+---
+
+## 🔧 常用命令
+
+### 启动服务器
+```bash
+source venv/bin/activate
+python web_dashboard.py
+```
+
+### 更新数据
+在 Web 界面点击 "Update Data" 按钮，或：
+```bash
+python tools/update_recent_data.py --days 5 --yes
+python strategy_recommender_fast.py
+```
+
+### 查看用户
+```bash
+python -c "
+import psycopg2
+conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+cursor = conn.cursor()
+cursor.execute('SELECT username, is_active FROM users')
+for row in cursor.fetchall():
+    print(f'{row[0]:15s} - {\"Active\" if row[1] else \"Inactive\"}')"
+```
+
+### 使用 Ngrok（无路由器控制权）
+```bash
+# 终端 1: 启动 Flask
+python web_dashboard.py
+
+# 终端 2: 启动 Ngrok
+ngrok http 8080
+# 会显示: https://abc123.ngrok.io
+```
+
+---
+
+## 🌟 最新更新
+
+### v2.1.0 (2026-01-06)
+- ✨ 新增仓位类型功能（Long/Short/Watch/Wishlist）
+- ✨ Watchlist 过滤功能
+- 📚 重新整理文档结构
+- 🐛 Bug 修复
+
+### v2.0.0 (2026-01-05)
+- ✨ 多用户认证系统
+- ✨ Ngrok 内网穿透支持
+- 📚 完整部署文档
+
+---
 
 ## 📁 项目结构
 
 ```
-strategy=Z/
-├── db/                         # 数据库模块
-│   ├── stock.db               # SQLite数据库文件 (1.47 GB)
-│   ├── init_db.py            # 数据库初始化和表结构
-│   └── api.py                # StockDB API类
-│
-├── script/                     # 分析脚本
-│   └── judgeV0.py            # 股票买卖判断函数
-│
-├── DATA/                       # 原始数据文件
-│   ├── nasdaq-listed.csv     # NASDAQ股票列表（完整版）
-│   └── nasdaq-listed-symbols.csv  # NASDAQ股票列表（筛选版）
-│
-├── tools/                      # 工具脚本
-│   ├── check_data_coverage.py     # 检查数据覆盖率
-│   ├── check_database.py          # 检查数据库状态
-│   ├── download_all_stocks.py     # 下载所有股票数据
-│   ├── estimate_download.py       # 估算下载时间和空间
-│   └── retry_failed_downloads.py  # 重试失败的下载
-│
-├── tests/                      # 测试文件
-│   ├── test_db.py             # Phase 1 测试
-│   ├── test_phase2.py         # Phase 2 测试
-│   ├── test_phase3.py         # Phase 3 测试
-│   └── test_phase4.py         # Phase 4 测试
-│
-├── docs/                       # 文档
-│   ├── 使用指南.md            # 中文使用指南
-│   ├── HOW_TO_USE.md          # English usage guide
-│   └── IMPLEMENTATION_SUMMARY.md  # 实现总结
-│
-└── README.md                   # 本文件
+StockItsMygo/
+├── web_dashboard.py          # Flask 主应用
+├── auth.py                   # 认证模块
+├── strategy_recommender_fast.py  # 推荐算法
+├── templates/
+│   ├── dashboard.html        # 主界面
+│   └── login.html            # 登录页面
+├── tools/
+│   └── update_recent_data.py # 数据更新
+├── migrations/               # 数据库迁移
+│   ├── 001_add_user_auth.sql
+│   └── 002_add_position_type.sql
+└── docs/                     # 📚 完整文档
+    ├── MASTER_README.md      # 文档导航
+    ├── setup/                # 设置指南
+    ├── features/             # 功能文档
+    ├── deployment/           # 部署指南
+    └── archive/              # 历史文档
 ```
-
-## 🚀 快速开始
-
-### ⭐ 每日观察工作流程（推荐）
-
-**适合**: 在开始真实交易前，每天观察和学习
-
-```bash
-python daily_observation.py
-```
-
-这会自动：
-1. 扫描市场寻找高动量股票
-2. 更新你的观察列表
-3. 下载详细的分钟级数据
-4. 运行3种策略对比分析
-5. 生成结构化的每日报告
-
-**报告位置**: `reports/2025/01-January/Week_01/2025-01-01_Monday.md`
-
-**详细指南**: [观察模式使用指南](docs/OBSERVATION_MODE_GUIDE.md)
 
 ---
 
-### 1. 基础查询
+## 🆘 需要帮助？
 
-```python
-from db.api import StockDB
-
-db = StockDB()
-
-# 查询股票价格历史
-df = db.get_price_history('AAPL')
-print(df.tail())
-
-# 获取最新价格
-latest = db.get_latest_price('AAPL')
-print(f"最新价格: ${latest['close']}")
-```
-
-### 2. 使用判断函数
-
-```python
-from script.judgeV0 import judge
-
-# 使用数据库模式（快速）
-result = judge('AAPL', use_db=True)
-print(result)  # BUY, SELL, 或 HOLD
-```
-
-### 3. 批量分析
-
-```python
-stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA']
-
-for symbol in stocks:
-    latest = db.get_latest_price(symbol)
-    print(f"{symbol}: ${latest['close']:.2f}")
-```
-
-## 📚 数据库包含的数据
-
-### 1. 价格历史 (2,156只股票)
-- 每日OHLCV（开盘、最高、最低、收盘、成交量）
-- 分红记录
-- 拆股记录
-
-### 2. 分析师数据 (AAPL, GOOGL, MSFT)
-- 分析师评级
-- 价格目标
-- 机构持仓
-- 内部交易
-
-### 3. 技术指标 (AAPL, MSFT, NVDA)
-- 移动平均线（MA5, MA20, MA60）
-- RSI、MACD、布林带
-
-### 4. 期权数据 (AAPL, MSFT)
-- 期权链
-- 希腊字母
-- 隐含波动率
-
-## 🛠️ 常用工具
-
-### 检查数据覆盖率
-```bash
-python tools/check_data_coverage.py
-```
-
-### 更新股票数据
-```python
-from db.api import StockDB
-db = StockDB()
-
-# 更新单只股票
-db.download_price_history('AAPL')
-
-# 批量更新
-stocks = ['AAPL', 'MSFT', 'GOOGL']
-db.batch_download_prices(stocks, workers=5)
-```
-
-### 下载所有股票
-```bash
-python tools/download_all_stocks.py
-```
-
-## 📖 详细文档
-
-- **[使用指南.md](docs/使用指南.md)** - 完整的中文使用文档，包含5个实战示例
-- **[HOW_TO_USE.md](docs/HOW_TO_USE.md)** - English version
-- **[IMPLEMENTATION_SUMMARY.md](docs/IMPLEMENTATION_SUMMARY.md)** - 项目实现总结
-
-## 💡 使用示例
-
-详细示例请查看 [使用指南.md](docs/使用指南.md)，包括：
-
-1. 查找表现最好的股票
-2. 使用判断函数
-3. 计算自定义指标
-4. 寻找突破股票
-5. 计算投资组合收益
-
-## 📈 策略系统
-
-### 内置策略
-
-1. **Momentum Strategy (动量策略)** - 适合牛市、上升趋势
-2. **Mean Reversion Strategy (均值回归策略)** - 适合震荡市场
-3. **Breakout Strategy (突破策略)** - 适合盘整后突破
-
-### 使用策略
-
-```python
-from script.strategy_manager import StrategyManager
-
-mgr = StrategyManager()
-
-# 单一策略
-strategy = mgr.get_strategy('momentum')
-signal = strategy.analyze('AAPL')
-
-# 对比所有策略
-comparison = mgr.compare_strategies('AAPL')
-
-# 策略组合
-combo = mgr.create_combo(['momentum', 'mean_reversion'], weights=[0.7, 0.3])
-```
-
-### 自定义策略
-
-复制模板创建你自己的策略：
-```bash
-cp script/strategies/custom_template.py script/strategies/my_strategy.py
-```
-
-详见: [策略系统使用指南](docs/策略系统使用指南.md)
+1. **查看文档**: [docs/MASTER_README.md](docs/MASTER_README.md)
+2. **常见问题**: [docs/setup/FAQ.md](docs/setup/FAQ.md)
+3. **网络问题**: [docs/setup/NETWORK.md](docs/setup/NETWORK.md)
+4. **功能使用**: [docs/features/](docs/features/)
 
 ---
 
-## 🔧 数据库架构
+## 🔐 安全提示
 
-16个表，38个索引：
-
-**核心表**:
-- `stocks` - 股票主表
-- `price_history` - 价格历史
-- `data_metadata` - 元数据跟踪
-
-**基本面表**:
-- `dividends` - 分红
-- `stock_splits` - 拆股
-- `financials` - 财务报表
-- `earnings` - 收益
-
-**分析师表**:
-- `analyst_ratings` - 分析师评级
-- `price_targets` - 价格目标
-- `institutional_holders` - 机构持仓
-- `insider_transactions` - 内部交易
-
-**期权/指标表**:
-- `options_chain` - 期权链
-- `technical_indicators` - 技术指标
-
-**观察模式表** (新增):
-- `intraday_price` - 分钟级价格数据
-- `watchlist` - 观察列表
-- `daily_reports` - 每日报告存档
-
-## 📊 性能优化
-
-- WAL模式启用
-- 批量插入优化
-- 增量更新支持
-- 索引优化查询
-
-## 🎯 下一步
-
-你可以：
-1. ✅ 查询任何股票的历史数据
-2. ✅ 使用judge函数快速判断买卖
-3. ✅ 编写自己的量化策略
-4. ✅ 回测交易策略
-5. ✅ 寻找投资机会
-
-## 📝 更新日志
-
-- **2025-12-29**: 项目完成，下载全部2,156只股票数据
-- **2025-12-28**: 数据库设计和API实现
-- **2025-12-28**: Phase 1-4 完成
+- ⚠️ 修改默认 admin 密码
+- ⚠️ 不要把邀请码发到公开论坛
+- ⚠️ 定期检查用户列表
+- ⚠️ 备份数据库
 
 ---
 
-**最后更新**: 2025-12-29
-**数据新鲜度**: 2025-12-26
+## 📝 License
+
+MIT License - 自由使用和修改
+
+---
+
+<div align="center">
+
+**Happy Trading! 📈**
+
+[文档](docs/MASTER_README.md) • [部署指南](docs/deployment/DEPLOYMENT.md) • [FAQ](docs/setup/FAQ.md)
+
+</div>
