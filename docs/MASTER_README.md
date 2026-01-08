@@ -39,43 +39,35 @@
 ### 2️⃣ 功能特性 (`features/`)
 系统核心功能和特性说明
 
-- **[每日股票推荐](features/RECOMMENDATIONS.md)**
-  - AI 推荐算法
-  - 过滤和筛选
-  - 评分系统
-
 - **[Watchlist 功能](features/WATCHLIST.md)**
   - 添加股票到监控列表
   - 4 种仓位类型（Long/Short/Watch/Wishlist）
   - 过滤和管理
+  - 自动收益计算
 
-- **[数据更新](features/DATA_UPDATE.md)**
-  - 一键更新最新数据
-  - 自动生成推荐
-  - 更新进度监控
+- **[数据库使用指南](DATABASE_GUIDE.md)**
+  - 双语文档（中英文）
+  - 数据查询示例
+  - 技术指标计算
+  - 投资组合分析
 
 ### 3️⃣ 部署与运维 (`deployment/`)
 部署、升级、备份相关文档
 
 - **[完整部署指南](deployment/DEPLOYMENT.md)**
-  - 系统要求
-  - 安装步骤
+  - 系统要求（硬件/软件）
+  - 详细安装步骤
+  - Docker 配置
+  - 数据库初始化
   - 验证清单
-
-- **[数据库迁移](deployment/MIGRATIONS.md)**
-  - 迁移历史
-  - 如何运行迁移
-  - 回滚指南
-
-- **[升级指南](deployment/UPGRADE.md)**
-  - 版本更新步骤
-  - 注意事项
+  - 常见问题解决
 
 ### 4️⃣ 归档文档 (`archive/`)
 历史文档，仅供参考
 
 - **实现总结** - 原始实现文档
-- **迁移状态** - 早期迁移记录
+- **迁移记录** - PostgreSQL 迁移技术文档
+- **策略系统** - 早期交易策略文档（已停用）
 
 ---
 
@@ -142,9 +134,15 @@ StockItsMygo/
 
 ## 📝 更新日志
 
+### 2026-01-07
+- ✅ **重大文档整理**：合并重复文档，精简结构
+- ✅ 新增 [DATABASE_GUIDE.md](DATABASE_GUIDE.md) - 双语数据库使用指南
+- ✅ 重写 [DEPLOYMENT.md](deployment/DEPLOYMENT.md) - 用户友好的部署指南
+- ✅ 归档旧技术文档和策略文档
+
 ### 2026-01-06
 - ✅ 添加仓位类型功能（Long/Short/Watch/Wishlist）
-- ✅ 整理文档结构
+- ✅ Watchlist 过滤和管理
 
 ### 2026-01-05
 - ✅ 多用户认证系统
@@ -174,7 +172,14 @@ StockItsMygo/
 - ✅ 合并重复内容
 - ✅ 清晰的分类结构
 
-**上次整理**: 2026-01-06
+**上次整理**: 2026-01-07
+
+**已删除/归档的重复文档**:
+- ❌ `HOW_TO_USE.md` → 合并到 `DATABASE_GUIDE.md`
+- ❌ `使用指南.md` → 合并到 `DATABASE_GUIDE.md`
+- ❌ `QUICK_START.md` → 合并到 `deployment/DEPLOYMENT.md`
+- ❌ `策略系统使用指南.md` → 归档到 `archive/`
+- ❌ `小资金动量交易指南.md` → 归档到 `archive/`
 
 ---
 

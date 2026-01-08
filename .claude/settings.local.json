@@ -47,7 +47,8 @@
       "Bash(__NEW_LINE__ echo -e \"\\\\n=== User B watchlist ===\")",
       "Bash(PGPASSWORD=stock_password psql:*)",
       "Bash(docker ps:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(tree:*)"
     ]
   }
 }

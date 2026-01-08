@@ -1,448 +1,672 @@
-# StockItsMygo - Deployment Summary
+# 🚀 StockItsMygo 部署指南
 
-**Date**: January 4, 2026
-**Platform**: macOS (Darwin 23.5.0)
-**Status**: ✅ **PRODUCTION READY**
+> 完整的系统安装、配置和启动指南
 
----
-
-## What Was Accomplished
-
-Successfully completed **dual migration** of the StockItsMygo stock analysis system:
-
-### 1. macOS Cross-Platform Migration ✅
-- Migrated from Windows-only paths (`d:/strategy=Z`) to cross-platform architecture
-- System now supports Windows, macOS, and Linux seamlessly
-- All 28 files updated with dynamic path resolution
-
-### 2. PostgreSQL + TimescaleDB Migration ✅
-- Upgraded from SQLite to PostgreSQL 16.11 + TimescaleDB 2.24.0
-- Downloaded 9.4 million historical price records for 2,138 stocks
-- Achieved 99.2% data coverage of NASDAQ stocks
-- Database size: 1.7 GB with time-series optimization
+**预计时间**: 30-60 分钟 | **难度**: 简单-中等
 
 ---
 
-## Current System Status
+## 📋 目录
 
-### Database Statistics
-
-```
-PostgreSQL Database (stock_db)
-├── Total stocks: 2,156 NASDAQ symbols
-├── Stocks with data: 2,138 (99.2% coverage)
-├── Price records: 9,406,966 (historical data back to IPO dates)
-├── Database size: 1,727 MB (1.7 GB)
-└── Missing: 18 stocks (delisted or unavailable)
-```
-
-### Sample Data Quality
-
-| Stock | Records | Historical Range | Latest Price |
-|-------|---------|-----------------|--------------|
-| AAPL | 250 | 2025-01-02 to 2025-12-31 | $271.86 |
-| MSFT | 10,029 | 1986-03-13 to 2025-12-31 | $483.62 |
-| GOOGL | 5,377 | 2004-08-19 to 2025-12-31 | $313.00 |
-| NVDA | 128 | 2025-07-01 to 2025-12-31 | $186.50 |
-| TSLA | 3,902 | 2010-06-29 to 2025-12-31 | $449.72 |
-| AMZN | 7,203 | 1997-05-15 to 2025-12-31 | $230.82 |
-| META | 3,425 | 2012-05-18 to 2025-12-31 | $660.09 |
+1. [系统要求](#系统要求)
+2. [安装步骤](#安装步骤)
+3. [启动系统](#启动系统)
+4. [验证安装](#验证安装)
+5. [常见问题](#常见问题)
+6. [下一步](#下一步)
 
 ---
 
-## Architecture Overview
+## 📊 系统要求
 
-### Dual-Backend Support
+### 硬件要求
 
-The system now supports **runtime switching** between SQLite and PostgreSQL:
+| 项目 | 最低配置 | 推荐配置 |
+|------|---------|---------|
+| **CPU** | 双核 2.0GHz | 四核 2.5GHz+ |
+| **内存** | 4GB RAM | 8GB+ RAM |
+| **硬盘** | 5GB 可用空间 | 10GB+ SSD |
+| **网络** | 宽带连接 | 高速宽带 |
 
-```python
-from config.database import config
+### 软件要求
 
-# Use SQLite (default, safe for testing)
-config.switch_to_sqlite()
+- **操作系统**: macOS 10.15+, Windows 10+, Ubuntu 18.04+
+- **Python**: 3.8 或更高版本
+- **Docker**: Docker Desktop (用于 PostgreSQL)
+- **浏览器**: Chrome, Firefox, Safari, Edge (最新版本)
 
-# Use PostgreSQL (production, better performance)
-config.switch_to_postgresql()
+---
+
+## 🛠️ 安装步骤
+
+### 步骤 1: 安装 Python
+
+#### macOS
+```bash
+# 检查是否已安装
+python3 --version
+
+# 如果未安装，使用 Homebrew 安装
+brew install python@3.11
 ```
 
-### Key Components
+#### Windows
+```bash
+# 下载并安装 Python 3.11
+# https://www.python.org/downloads/
+# 安装时勾选 "Add Python to PATH"
 
-1. **config/paths.py** - Cross-platform path management
-2. **config/database.py** - Dual-backend configuration
-3. **db/connection.py** - SQL abstraction layer
-4. **db/init_db_postgres.py** - Database initialization
-5. **docker-compose.yml** - PostgreSQL container orchestration
+# 验证安装
+python --version
+```
 
----
+#### Linux (Ubuntu/Debian)
+```bash
+sudo apt update
+sudo apt install python3.11 python3-pip python3-venv
+```
 
-## Performance Improvements
+### 步骤 2: 安装 Docker
 
-| Metric | SQLite | PostgreSQL | Improvement |
-|--------|--------|------------|-------------|
-| **Concurrent Workers** | 1 (locks) | 10+ | 10x |
-| **Single Query** | ~5ms | ~3ms | 1.7x faster |
-| **Batch Query (10 stocks)** | ~50ms | ~28ms | 1.8x faster |
-| **Insert 1000 rows** | ~200ms | ~60ms | 3.3x faster |
-| **Database Locked Errors** | Frequent | Never | ∞ |
+#### macOS
+```bash
+# 下载 Docker Desktop for Mac
+# https://www.docker.com/products/docker-desktop
 
----
+# 安装完成后启动 Docker Desktop
+# 验证安装
+docker --version
+docker-compose --version
+```
 
-## How to Use
+#### Windows
+```bash
+# 下载 Docker Desktop for Windows
+# https://www.docker.com/products/docker-desktop
 
-### Starting the System
+# 安装完成后启动 Docker Desktop
+# 验证安装
+docker --version
+docker-compose --version
+```
+
+#### Linux
+```bash
+# 安装 Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# 安装 Docker Compose
+sudo apt install docker-compose
+
+# 启动 Docker 服务
+sudo systemctl start docker
+sudo systemctl enable docker
+```
+
+### 步骤 3: 克隆项目（如果需要）
 
 ```bash
-# 1. Navigate to project
-cd ~/Projects/strategy-z
+# 如果项目已存在，跳过此步骤
+cd ~
+git clone https://github.com/your-username/StockItsMygo.git
+cd StockItsMygo
+```
 
-# 2. Activate virtual environment
-source venv/bin/activate
+### 步骤 4: 创建虚拟环境
 
-# 3. Start PostgreSQL (if not already running)
+```bash
+# 进入项目目录
+cd /Users/hostsjim/StockItsMygo  # macOS/Linux
+# 或
+cd C:\Users\YourName\StockItsMygo  # Windows
+
+# 创建虚拟环境
+python3 -m venv venv  # macOS/Linux
+# 或
+python -m venv venv   # Windows
+
+# 激活虚拟环境
+source venv/bin/activate  # macOS/Linux
+# 或
+venv\Scripts\activate     # Windows
+
+# 验证
+which python  # 应该显示 venv/bin/python
+```
+
+### 步骤 5: 安装 Python 依赖
+
+```bash
+# 确保虚拟环境已激活
+pip install --upgrade pip
+
+# 安装所有依赖
+pip install -r requirements.txt
+
+# 验证关键包
+pip list | grep -E "flask|psycopg2|yfinance|pandas|plotly"
+```
+
+### 步骤 6: 启动 PostgreSQL 数据库
+
+```bash
+# 启动 Docker 容器
 docker-compose up -d
 
-# 4. Verify database is running
+# 验证容器运行
+docker-compose ps
+
+# 查看日志（可选）
+docker-compose logs -f timescaledb
+
+# 按 Ctrl+C 退出日志查看
+```
+
+**预期输出**:
+```
+NAME                   IMAGE                       STATUS
+strategy-z-pg          timescale/timescaledb:...   Up
+```
+
+### 步骤 7: 初始化数据库
+
+```bash
+# 进入 Python 环境
+python
+
+# 在 Python 中运行
+>>> from db.init_db_postgres import init_database
+>>> init_database()
+>>> exit()
+```
+
+**预期输出**:
+```
+✓ Database initialized
+✓ Tables created
+✓ Indexes created
+✓ TimescaleDB hypertable configured
+```
+
+### 步骤 8: 下载股票列表
+
+```bash
+# 下载 NASDAQ 股票列表（快速）
+python -c "
+from db.api import StockDB
+db = StockDB()
+# 股票列表会自动从 NASDAQ 下载
+print('✓ Stock list downloaded')
+"
+```
+
+### 步骤 9: 下载初始数据（可选但推荐）
+
+```bash
+# 下载前100只股票的数据（测试用，约5-10分钟）
+python tools/update_recent_data.py --limit 100 --days 365
+
+# 或下载所有股票（生产用，约2-4小时）
+# python tools/download_all_stocks.py
+```
+
+---
+
+## 🎯 启动系统
+
+### 方法 1: 直接启动 Flask
+
+```bash
+# 1. 确保 PostgreSQL 运行
+docker-compose ps
+
+# 2. 激活虚拟环境
+source venv/bin/activate  # macOS/Linux
+# 或
+venv\Scripts\activate     # Windows
+
+# 3. 启动 Flask 服务器
+python web_dashboard.py
+```
+
+**预期输出**:
+```
+* Running on http://localhost:8080
+* Running on http://192.168.x.x:8080
+```
+
+### 方法 2: 后台运行（推荐）
+
+```bash
+# macOS/Linux
+nohup python web_dashboard.py > logs/flask.log 2>&1 &
+
+# Windows
+start /B python web_dashboard.py > logs\flask.log 2>&1
+```
+
+### 访问系统
+
+打开浏览器，访问:
+```
+http://localhost:8080
+```
+
+**默认登录账号**:
+- 用户名: `admin`
+- 密码: `admin123`
+
+⚠️ **重要**: 首次登录后请立即修改密码！
+
+---
+
+## ✅ 验证安装
+
+### 1. 检查 Docker 容器
+
+```bash
 docker-compose ps
 ```
 
-### Running Queries
+**预期**: `strategy-z-pg` 状态为 `Up`
 
-```python
+### 2. 检查数据库连接
+
+```bash
+python -c "
 from config.database import config
 from db.api import StockDB
 
-# Switch to PostgreSQL
 config.switch_to_postgresql()
+db = StockDB()
+stocks = db.get_stock_list()
+print(f'✓ Database connected: {len(stocks)} stocks')
+"
+```
 
-# Create database instance
+**预期输出**: `✓ Database connected: 2156 stocks`
+
+### 3. 检查 Web 服务器
+
+```bash
+curl http://localhost:8080
+```
+
+**预期**: 返回 HTML 内容（登录页面）
+
+### 4. 检查数据完整性
+
+```bash
+python -c "
+from db.api import StockDB
 db = StockDB()
 
-# Get stock list
-stocks = db.get_stock_list()
-print(f"Loaded {len(stocks)} stocks")
+# 检查价格数据
+import subprocess
+result = subprocess.run([
+    'docker', 'exec', 'strategy-z-pg',
+    'psql', '-U', 'stock_user', '-d', 'stock_db',
+    '-c', 'SELECT COUNT(*) FROM price_history;'
+], capture_output=True, text=True)
 
-# Get price history
-history = db.get_price_history('AAPL')
-print(f"AAPL: {len(history)} records")
-
-# Get latest price
-latest = db.get_latest_price('MSFT')
-print(f"MSFT: ${latest['close']:.2f}")
+print(result.stdout)
+"
 ```
 
-### Daily Workflow
+**预期**: 显示价格记录数量
 
-```bash
-# Update recent data (last 5 days)
-python tools/update_recent_data.py --days 5
+---
 
-# Run daily observation
-python daily_observation.py
+## 🔧 配置选项
 
-# Generate reports
-python tools/daily_update.py
+### 1. 更改 Flask 端口
+
+编辑 `web_dashboard.py`:
+```python
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8888, debug=False)  # 改为 8888
 ```
 
-### Updating Stock Data
+### 2. 切换数据库后端
+
+```python
+# 在代码中切换
+from config.database import config
+
+# 使用 PostgreSQL（推荐）
+config.switch_to_postgresql()
+
+# 使用 SQLite（备份）
+config.switch_to_sqlite()
+```
+
+### 3. 配置数据更新频率
+
+编辑 `tools/update_recent_data.py` 或在 cron 中设置:
 
 ```bash
-# Download all stocks (first time or full refresh)
-python tools/download_all_stocks.py
+# macOS/Linux - 每天早上 8 点更新
+crontab -e
 
-# Continue partial download
-python tools/continue_download.py
+# 添加以下行
+0 8 * * * cd /path/to/StockItsMygo && source venv/bin/activate && python tools/update_recent_data.py --days 5 --yes
+```
 
-# Retry failed downloads
-python tools/retry_failed_downloads.py
+### 4. 设置邀请码
+
+编辑 `auth.py`:
+```python
+VALID_INVITE_CODES = [
+    'stocktest2026',
+    'your_custom_code',  # 添加你的邀请码
+]
 ```
 
 ---
 
-## Docker Management
+## 🆘 常见问题
 
-### Basic Commands
+### Q1: Docker 容器启动失败
 
+**问题**: `docker-compose up -d` 失败
+
+**解决**:
 ```bash
-# Start PostgreSQL container
-docker-compose up -d
+# 检查 Docker 是否运行
+docker ps
 
-# Stop PostgreSQL container
+# 查看错误日志
+docker-compose logs
+
+# 重启 Docker Desktop
+# macOS: 重启 Docker Desktop 应用
+# Linux: sudo systemctl restart docker
+
+# 删除旧容器重新创建
 docker-compose down
-
-# View logs
-docker-compose logs -f timescaledb
-
-# Check status
-docker-compose ps
-
-# Access PostgreSQL shell
-docker exec -it strategy-z-pg psql -U stock_user -d stock_db
+docker-compose up -d
 ```
 
-### Database Maintenance
+### Q2: 数据库连接失败
+
+**问题**: `psycopg2.OperationalError: could not connect`
+
+**解决**:
+```bash
+# 1. 检查容器是否运行
+docker-compose ps
+
+# 2. 检查端口是否被占用
+lsof -i :5432  # macOS/Linux
+netstat -ano | findstr :5432  # Windows
+
+# 3. 测试数据库连接
+docker exec -it strategy-z-pg psql -U stock_user -d stock_db -c "SELECT 1;"
+```
+
+### Q3: 依赖安装失败
+
+**问题**: `pip install` 报错
+
+**解决**:
+```bash
+# 升级 pip
+pip install --upgrade pip setuptools wheel
+
+# 单独安装问题包
+pip install psycopg2-binary
+pip install pandas
+pip install yfinance
+
+# 如果是 macOS M1/M2 芯片
+arch -arm64 pip install psycopg2-binary
+```
+
+### Q4: 端口 8080 已被占用
+
+**问题**: `Address already in use: 8080`
+
+**解决**:
+```bash
+# 查找占用端口的进程
+lsof -i :8080  # macOS/Linux
+netstat -ano | findstr :8080  # Windows
+
+# 杀死进程
+kill -9 <PID>  # macOS/Linux
+taskkill /PID <PID> /F  # Windows
+
+# 或更改 Flask 端口（见配置选项）
+```
+
+### Q5: 虚拟环境激活失败
+
+**问题**: `activate: No such file or directory`
+
+**解决**:
+```bash
+# 重新创建虚拟环境
+rm -rf venv
+python3 -m venv venv
+
+# Windows PowerShell 可能需要
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+更多问题？查看 [FAQ](../setup/FAQ.md)
+
+---
+
+## 📊 数据库管理
+
+### Docker 命令速查
 
 ```bash
-# Check database size
+# 启动数据库
+docker-compose up -d
+
+# 停止数据库
+docker-compose down
+
+# 重启数据库
+docker-compose restart
+
+# 查看日志
+docker-compose logs -f timescaledb
+
+# 进入数据库 shell
+docker exec -it strategy-z-pg psql -U stock_user -d stock_db
+
+# 查看数据库大小
 docker exec strategy-z-pg psql -U stock_user -d stock_db -c \
   "SELECT pg_size_pretty(pg_database_size('stock_db'));"
 
-# Check table sizes
-docker exec strategy-z-pg psql -U stock_user -d stock_db -c \
-  "SELECT schemaname, tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
-   FROM pg_tables
-   WHERE schemaname = 'public'
-   ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;"
+# 备份数据库
+docker exec strategy-z-pg pg_dump -U stock_user stock_db > backup_$(date +%Y%m%d).sql
 
-# Vacuum database (optimize)
+# 恢复数据库
+cat backup_20260107.sql | docker exec -i strategy-z-pg psql -U stock_user -d stock_db
+```
+
+### 常用 SQL 查询
+
+```sql
+-- 连接数据库
+docker exec -it strategy-z-pg psql -U stock_user -d stock_db
+
+-- 查看所有表
+\dt
+
+-- 统计股票数量
+SELECT COUNT(*) FROM stocks;
+
+-- 统计价格记录
+SELECT COUNT(*) FROM price_history;
+
+-- 查看最新价格
+SELECT symbol, date, close
+FROM price_history
+WHERE symbol = 'AAPL'
+ORDER BY date DESC
+LIMIT 5;
+
+-- 查看数据覆盖率
+SELECT
+    COUNT(DISTINCT symbol) as stocks_with_data,
+    MIN(date) as earliest_date,
+    MAX(date) as latest_date
+FROM price_history;
+
+-- 退出
+\q
+```
+
+---
+
+## 🎯 下一步
+
+安装完成后，你可以：
+
+### 1. 配置远程访问
+
+让朋友也能访问你的系统：
+- 📖 [网络配置指南](../setup/NETWORK.md)
+
+### 2. 添加用户
+
+创建新用户账号：
+- 📖 [用户认证指南](../setup/AUTHENTICATION.md)
+
+### 3. 学习使用数据库
+
+编写自己的股票分析代码：
+- 📖 [数据库使用指南](../DATABASE_GUIDE.md)
+
+### 4. 自定义推荐算法
+
+调整股票推荐参数：
+- 📖 查看 `strategy_recommender_fast.py`
+
+### 5. 设置自动更新
+
+每日自动更新股票数据：
+- 📖 [数据更新指南](../features/DATA_UPDATE.md)
+
+---
+
+## 📚 相关文档
+
+| 文档 | 用途 |
+|------|------|
+| [MASTER_README.md](../MASTER_README.md) | 文档总导航 |
+| [NETWORK.md](../setup/NETWORK.md) | 网络配置（局域网/公网） |
+| [AUTHENTICATION.md](../setup/AUTHENTICATION.md) | 用户管理 |
+| [DATABASE_GUIDE.md](../DATABASE_GUIDE.md) | 数据库使用 |
+| [WATCHLIST.md](../features/WATCHLIST.md) | Watchlist 功能 |
+| [FAQ.md](../setup/FAQ.md) | 常见问题 |
+
+---
+
+## 🔧 系统架构
+
+```
+┌─────────────────────────────────────────────┐
+│           用户浏览器 (Browser)               │
+│         http://localhost:8080                │
+└──────────────────┬──────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────┐
+│        Flask Web Server (web_dashboard.py)  │
+│  - 用户认证 (auth.py)                       │
+│  - 推荐算法 (strategy_recommender_fast.py) │
+│  - API 端点                                  │
+└──────────────────┬──────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────┐
+│         Database API (db/api.py)            │
+│  - StockDB 类                               │
+│  - 数据查询方法                             │
+└──────────────────┬──────────────────────────┘
+                   │
+           ┌───────┴───────┐
+           ▼               ▼
+┌──────────────────┐ ┌──────────────────┐
+│   PostgreSQL     │ │     SQLite       │
+│  + TimescaleDB   │ │   (备份后端)     │
+│   (Docker)       │ │   db/stock.db    │
+└──────────────────┘ └──────────────────┘
+```
+
+---
+
+## ⚡ 性能优化建议
+
+### 1. PostgreSQL 配置（高级）
+
+编辑 `docker-compose.yml`:
+```yaml
+environment:
+  - POSTGRES_PASSWORD=stock_password
+  - shared_buffers=256MB        # 增加共享内存
+  - effective_cache_size=1GB    # 缓存大小
+  - work_mem=16MB               # 工作内存
+```
+
+### 2. 启用数据压缩
+
+```sql
+-- 连接数据库
+docker exec -it strategy-z-pg psql -U stock_user -d stock_db
+
+-- 启用压缩（节省空间）
+SELECT add_compression_policy('price_history', INTERVAL '7 days');
+```
+
+### 3. 定期维护
+
+```bash
+# 每周运行一次
 docker exec strategy-z-pg psql -U stock_user -d stock_db -c "VACUUM ANALYZE;"
 ```
 
 ---
 
-## Testing
+## 🔒 安全建议
 
-### Backend Testing
-
-```bash
-# Test SQLite backend
-python -c "
-from config.database import config
-from db.api import StockDB
-
-config.switch_to_sqlite()
-db = StockDB()
-stocks = db.get_stock_list()
-print(f'✓ SQLite: {len(stocks)} stocks')
-"
-
-# Test PostgreSQL backend
-python -c "
-from config.database import config
-from db.api import StockDB
-
-config.switch_to_postgresql()
-db = StockDB()
-stocks = db.get_stock_list()
-print(f'✓ PostgreSQL: {len(stocks)} stocks')
-"
-```
-
-### Integration Testing
-
-```bash
-# Run all test suites
-python tests/test_db.py
-python tests/test_phase2.py
-python tests/test_phase3.py
-python tests/test_phase4.py
-
-# Test specific components
-python test_data_contract.py
-python test_event_discovery.py
-python test_anomaly_detector.py
-```
+1. **修改默认密码**: 首次登录后立即更改 admin 密码
+2. **保护邀请码**: 不要在公开论坛分享邀请码
+3. **使用 HTTPS**: 生产环境建议使用 Nginx + SSL
+4. **定期备份**: 每周备份一次数据库
+5. **限制访问**: 配置防火墙规则
 
 ---
 
-## File Structure
+## 📞 获取帮助
 
-```
-StockItsMygo/
-├── config/
-│   ├── __init__.py
-│   ├── database.py          # Dual-backend configuration
-│   └── paths.py             # Cross-platform paths
-├── db/
-│   ├── api.py               # Main database API (dual-backend)
-│   ├── connection.py        # SQL abstraction layer
-│   ├── init_db.py           # SQLite initialization
-│   ├── init_db_postgres.py  # PostgreSQL initialization
-│   ├── stock.db             # SQLite database (if used)
-│   └── pg-config/
-│       └── init.sql         # PostgreSQL init script
-├── tools/
-│   ├── download_all_stocks.py      # Full download
-│   ├── continue_download.py        # Resume download
-│   ├── update_recent_data.py       # Update recent prices
-│   └── daily_update.py             # Daily workflow
-├── docker-compose.yml       # PostgreSQL container config
-├── pg-data/                 # PostgreSQL data (Docker volume)
-├── MIGRATION_STATUS.md      # Detailed migration report
-├── MIGRATION_COMPLETE.md    # Technical documentation
-├── QUICK_START.md           # Quick reference guide
-└── DEPLOYMENT_SUMMARY.md    # This file
-```
+遇到问题？这里有一些资源：
+
+1. **查看日志**:
+   ```bash
+   # Flask 日志
+   tail -f logs/flask.log
+
+   # Docker 日志
+   docker-compose logs -f
+   ```
+
+2. **检查文档**:
+   - [FAQ](../setup/FAQ.md) - 常见问题
+   - [MASTER_README.md](../MASTER_README.md) - 完整文档
+
+3. **社区支持**:
+   - GitHub Issues
+   - 项目 Wiki
 
 ---
 
-## Known Issues
+**部署完成！开始探索 StockItsMygo 吧！** 📈
 
-### 1. pandas SQLAlchemy Warning
-
-**Warning**: `pandas only supports SQLAlchemy connectable...`
-
-- **Status**: Non-critical, does not affect functionality
-- **Impact**: None - all queries work correctly
-- **Future Fix**: Migrate to SQLAlchemy engine (optional improvement)
-
-### 2. Numeric Overflow (7 stocks)
-
-**Affected Stocks**: ENVB, CLRB, CETX, BNBX, BGMS, ADTX
-
-- **Reason**: Stock prices exceed NUMERIC(12,4) precision limit
-- **Impact**: These 7 stocks cannot be stored in price_history
-- **Future Fix**: Increase precision to NUMERIC(16,4) if needed
-
-### 3. Data Unavailable (11 stocks)
-
-- **Reason**: Delisted, ticker changed, or data not available from yfinance
-- **Impact**: Expected behavior, no system issue
-- **Total Missing**: 18 stocks out of 2,156 (0.8%)
-
----
-
-## Rollback Procedures
-
-### Quick Rollback to SQLite
-
-```python
-# Method 1: Runtime switching (instant)
-from config.database import config
-config.switch_to_sqlite()
-
-# Method 2: Change default in config/database.py
-# Edit: DB_TYPE = 'sqlite'
-```
-
-### Stop PostgreSQL
-
-```bash
-# Stop container (data preserved)
-docker-compose down
-
-# Remove container and data (CAUTION: deletes all data)
-docker-compose down -v
-```
-
----
-
-## Backup and Recovery
-
-### PostgreSQL Backup
-
-```bash
-# Backup entire database
-docker exec strategy-z-pg pg_dump -U stock_user stock_db > backup_$(date +%Y%m%d).sql
-
-# Backup specific table
-docker exec strategy-z-pg pg_dump -U stock_user -t price_history stock_db > price_history_backup.sql
-
-# Compress backup
-docker exec strategy-z-pg pg_dump -U stock_user stock_db | gzip > backup_$(date +%Y%m%d).sql.gz
-```
-
-### PostgreSQL Restore
-
-```bash
-# Restore from backup
-cat backup_20260104.sql | docker exec -i strategy-z-pg psql -U stock_user -d stock_db
-
-# Restore compressed backup
-gunzip -c backup_20260104.sql.gz | docker exec -i strategy-z-pg psql -U stock_user -d stock_db
-```
-
-### SQLite Backup
-
-```bash
-# SQLite database is just a file
-cp db/stock.db db/stock_backup_$(date +%Y%m%d).db
-
-# Restore
-cp db/stock_backup_20260104.db db/stock.db
-```
-
----
-
-## Future Enhancements (Optional)
-
-### 1. Production Cutover
-Currently using SQLite as default for safety. To make PostgreSQL the default:
-
-```python
-# Edit config/database.py
-DB_TYPE = 'postgresql'  # Change from 'sqlite'
-```
-
-### 2. Remaining Conversions
-8 INSERT OR REPLACE statements still need conversion:
-- dividends, stock_splits
-- analyst_ratings, price_targets
-- institutional_holders, insider_transactions
-- options_chain, technical_indicators
-
-**Priority**: Low - these methods work, just need PostgreSQL optimization
-
-### 3. SQLAlchemy Migration
-- Replace psycopg2 with SQLAlchemy engine
-- Eliminates pandas warnings
-- Better connection pooling
-- ORM support (optional)
-
-### 4. Performance Tuning
-- Add more indexes for common query patterns
-- Configure PostgreSQL shared_buffers for larger dataset
-- Enable TimescaleDB compression policies
-- Set up continuous aggregates for dashboards
-
-### 5. Monitoring
-- Add pgAdmin for database administration
-- Set up Grafana for performance monitoring
-- Configure alerts for database health
-
----
-
-## Success Metrics
-
-- ✅ Cross-platform compatibility achieved
-- ✅ 99.2% data coverage (2,138/2,156 stocks)
-- ✅ 9.4 million price records migrated
-- ✅ 10x improvement in concurrent access
-- ✅ 1.7-3.3x faster query performance
-- ✅ Zero "database locked" errors
-- ✅ All test suites passing
-- ✅ Backward compatibility maintained
-- ✅ Production ready
-
----
-
-## Support and Documentation
-
-- **Migration Status**: [MIGRATION_STATUS.md](MIGRATION_STATUS.md)
-- **Technical Details**: [MIGRATION_COMPLETE.md](MIGRATION_COMPLETE.md)
-- **Quick Start**: [QUICK_START.md](QUICK_START.md)
-- **Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md)
-
----
-
-## Conclusion
-
-The StockItsMygo stock analysis system has been successfully migrated to macOS with PostgreSQL + TimescaleDB. The system is now:
-
-- **Production Ready** with 99.2% data coverage
-- **Scalable** with support for 10+ concurrent workers
-- **Cross-Platform** compatible (Windows/macOS/Linux)
-- **Performant** with time-series optimization via TimescaleDB
-- **Flexible** with runtime backend switching capability
-
-The migration was completed in **~2 days**, faster than the original 4-5 day estimate, thanks to:
-- Fresh data download (no Windows transfer needed)
-- Automated transformation scripts
-- Comprehensive testing at each phase
-
-**Total effort**: ~27 hours over 2 days
-**Final status**: All validation tests passed, system operational
-
----
-
-*Last updated: January 4, 2026*
+*最后更新: 2026-01-07*
