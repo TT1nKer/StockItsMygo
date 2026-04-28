@@ -22,11 +22,23 @@
 
 ## 🚀 快速开始
 
-### 1. 启动服务器
+### Docker (推荐 · 一键启动)
 
 ```bash
-cd /Users/hostsjim/StockItsMygo
-source venv/bin/activate
+git clone https://github.com/TT1nKer/StockItsMygo.git
+cd StockItsMygo
+docker compose up -d
+```
+
+服务起来后访问 http://localhost:8080。
+
+### 本地 Python 环境
+
+```bash
+git clone https://github.com/TT1nKer/StockItsMygo.git
+cd StockItsMygo
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
 python web_dashboard.py
 ```
 
@@ -103,6 +115,17 @@ PostgreSQL 13 + TimescaleDB • Python 3.x + Flask • Plotly.js • yfinance
 ## 🔐 安全提示
 
 ⚠️ 修改默认密码 • ⚠️ 保护邀请码 • ⚠️ 定期备份数据库
+
+---
+
+## 📌 当前状态 / Limitations
+
+- **状态**：active · 个人使用中，非生产级
+- **数据源**：yfinance（免费、有延迟、偶尔限流）
+- **推荐策略**：基于技术指标（RSI、动量、量能），不构成投资建议
+- **覆盖范围**：美股 2,156 只主流标的，不含期权/加密
+- **回测**：策略推荐器尚未对接完整回测框架（roadmap）
+- **多用户**：邀请码注册可用，但未做严格的速率限制 / 审计日志
 
 ---
 
