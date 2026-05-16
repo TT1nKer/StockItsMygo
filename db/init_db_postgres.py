@@ -162,7 +162,8 @@ def init_database(db_path=None):
     _create_options_chain_table(cursor)
     _create_technical_indicators_table(cursor)
     _create_intraday_price_table(cursor)
-    _create_watchlist_table(cursor)
+    _create_users_table(cursor)
+    _create_user_watchlist_table(cursor)
     _create_daily_reports_table(cursor)
 
     # 恢复外键约束
@@ -179,9 +180,9 @@ def init_database(db_path=None):
     print("  Fundamental tables: dividends, stock_splits, financials, earnings")
     print("  Analyst tables: analyst_ratings, price_targets, institutional_holders, insider_transactions")
     print("  Options/Indicators tables: options_chain, technical_indicators")
-    print("  Intraday/Watchlist tables: intraday_price, watchlist, daily_reports")
-    print("  Total tables: 16")
-    print("  Total indexes: 38")
+    print("  Auth/Watchlist tables: users, user_watchlist")
+    print("  Intraday/Report tables: intraday_price, daily_reports")
+    print("  Total tables: 17")
 
     if config.DB_TYPE == 'postgresql':
         print("  ✓ TimescaleDB Hypertable: price_history")
@@ -636,47 +637,57 @@ def _create_intraday_price_table(cursor):
     cursor.execute(db_connection.create_index('idx_intraday_interval', 'intraday_price', ['interval']))
 
 
-def _create_watchlist_table(cursor):
-    """创建观察列表表"""
-    autoincrement = db_connection.get_autoincrement_type()
-
+def _create_users_table(cursor):
+    """用户表（多用户认证）— PostgreSQL only; auth.py 不支持 SQLite"""
     if config.DB_TYPE == 'sqlite':
-        cursor.execute(f'''
-            CREATE TABLE IF NOT EXISTS watchlist (
-                id {autoincrement},
-                symbol TEXT NOT NULL,
-                added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                priority INTEGER DEFAULT 2,
-                source TEXT,
-                notes TEXT,
-                target_price REAL,
-                stop_loss REAL,
-                is_active INTEGER DEFAULT 1,
-                FOREIGN KEY (symbol) REFERENCES stocks(symbol) ON DELETE CASCADE,
-                UNIQUE(symbol, is_active)
-            )
-        ''')
-    else:
-        cursor.execute(f'''
-            CREATE TABLE IF NOT EXISTS watchlist (
-                id {autoincrement},
-                symbol VARCHAR(20) NOT NULL,
-                added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                priority INTEGER DEFAULT 2,
-                source VARCHAR(50),
-                notes TEXT,
-                target_price NUMERIC(12, 4),
-                stop_loss NUMERIC(12, 4),
-                is_active INTEGER DEFAULT 1,
-                UNIQUE(symbol, is_active)
-            )
-        ''')
+        print("  ! Skipping users table — auth requires PostgreSQL")
+        return
 
-    cursor.execute(db_connection.create_index('idx_watchlist_symbol', 'watchlist', ['symbol']))
-    cursor.execute(db_connection.create_index('idx_watchlist_priority', 'watchlist', ['priority']))
-    cursor.execute(db_connection.create_index('idx_watchlist_source', 'watchlist', ['source']))
-    cursor.execute(db_connection.create_index('idx_watchlist_added_date', 'watchlist', ['added_date']))
-    cursor.execute(db_connection.create_index('idx_watchlist_active', 'watchlist', ['is_active']))
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            is_active BOOLEAN DEFAULT true
+        )
+    ''')
+
+    # Seed default admin (username=admin, password=admin123).
+    # WARNING: change immediately after first login.
+    cursor.execute('''
+        INSERT INTO users (id, username, password_hash, is_active)
+        VALUES (1, 'admin',
+                'pbkdf2:sha256:1000000$uMOZ8onbVuFAXc1o$a939111536d66f12773b530fa038eb193f785261dcf52148aeed38607eae0232',
+                true)
+        ON CONFLICT (id) DO NOTHING
+    ''')
+    cursor.execute("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users))")
+
+
+def _create_user_watchlist_table(cursor):
+    """观察列表（多用户版本）— web_dashboard.py 实际读写的表"""
+    if config.DB_TYPE == 'sqlite':
+        print("  ! Skipping user_watchlist table — auth requires PostgreSQL")
+        return
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_watchlist (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            symbol VARCHAR(20) NOT NULL,
+            added_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            target_date DATE,
+            notes TEXT,
+            position_type VARCHAR(20) DEFAULT 'watch',
+            is_active BOOLEAN DEFAULT true,
+            CONSTRAINT unique_user_symbol UNIQUE (user_id, symbol),
+            CONSTRAINT check_position_type CHECK (position_type IN ('long','short','watch','wishlist'))
+        )
+    ''')
+    cursor.execute(db_connection.create_index('idx_user_watchlist_user', 'user_watchlist', ['user_id']))
+    cursor.execute(db_connection.create_index('idx_user_watchlist_active', 'user_watchlist', ['user_id', 'is_active']))
 
 
 def _create_daily_reports_table(cursor):
