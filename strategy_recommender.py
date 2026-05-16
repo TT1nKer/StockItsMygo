@@ -203,7 +203,7 @@ class StockRecommender:
         import psycopg2
         from psycopg2.extras import execute_values
 
-        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        conn = psycopg2.connect(config.get_connection_string())
         cursor = conn.cursor()
 
         # Create recommendations table if not exists

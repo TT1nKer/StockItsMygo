@@ -18,7 +18,7 @@ config.switch_to_postgresql()
 
 class FastStockRecommender:
     def __init__(self):
-        self.conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        self.conn = psycopg2.connect(config.get_connection_string())
         self.price_cache = {}  # Cache all price data in memory
 
     def load_all_price_data(self):

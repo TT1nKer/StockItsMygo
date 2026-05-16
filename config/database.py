@@ -13,12 +13,13 @@ class DatabaseConfig:
         from config.paths import paths
         return paths.db_path
 
-    # PostgreSQL config
-    PG_HOST = 'localhost'
-    PG_PORT = 5432
-    PG_USER = 'stock_user'
-    PG_PASSWORD = 'stock_password'
-    PG_DATABASE = 'stock_db'
+    # PostgreSQL config — env-var overrides let the CN branch / second DB
+    # flip backend without touching source (see docker-compose for ports).
+    PG_HOST = os.environ.get('STOCK_PG_HOST', 'localhost')
+    PG_PORT = int(os.environ.get('STOCK_PG_PORT', 5432))
+    PG_USER = os.environ.get('STOCK_PG_USER', 'stock_user')
+    PG_PASSWORD = os.environ.get('STOCK_PG_PASSWORD', 'stock_password')
+    PG_DATABASE = os.environ.get('STOCK_PG_DATABASE', 'stock_db')
     PG_CONNECT_TIMEOUT = 30
 
     @classmethod

@@ -117,7 +117,7 @@ def get_stats():
     """Get overall database statistics"""
     try:
         import psycopg2
-        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        conn = psycopg2.connect(config.get_connection_string())
         cursor = conn.cursor()
 
         # Get counts
@@ -130,7 +130,7 @@ def get_stats():
         cursor.execute('SELECT COUNT(*) FROM price_history')
         total_records = cursor.fetchone()[0]
 
-        cursor.execute("SELECT pg_size_pretty(pg_database_size('stock_db'))")
+        cursor.execute("SELECT pg_size_pretty(pg_database_size(%s))", (config.PG_DATABASE,))
         db_size = cursor.fetchone()[0]
 
         cursor.execute('SELECT MAX(date) FROM price_history')
@@ -287,7 +287,7 @@ def get_daily_recommendations():
         min_score = request.args.get('min_score', 30, type=int)
         max_results = request.args.get('limit', 200, type=int)  # Default: show up to 200
 
-        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        conn = psycopg2.connect(config.get_connection_string())
         cursor = conn.cursor()
 
         # Get today's recommendations with score filter
@@ -352,7 +352,7 @@ def get_user_watchlist():
         from datetime import datetime
 
         user_id = get_current_user_id()
-        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        conn = psycopg2.connect(config.get_connection_string())
         cursor = conn.cursor()
 
         # Get watchlist stocks for current user only
@@ -429,7 +429,7 @@ def add_to_watchlist():
         if not symbol:
             return jsonify({'error': 'Symbol required'}), 400
 
-        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        conn = psycopg2.connect(config.get_connection_string())
         cursor = conn.cursor()
 
         # Note: table structure now includes user_id (added by migration)
@@ -464,7 +464,7 @@ def remove_from_watchlist(symbol):
         import psycopg2
 
         user_id = get_current_user_id()
-        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        conn = psycopg2.connect(config.get_connection_string())
         cursor = conn.cursor()
 
         cursor.execute("""

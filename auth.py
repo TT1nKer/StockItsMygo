@@ -8,9 +8,15 @@ from flask import session, redirect, url_for, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 
+from config.database import config
+
 # Configuration
 INVITATION_CODE = "stocktest2026"
-DB_CONN = "host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password"
+
+
+def _db_conn():
+    """Compute connection string lazily so env-var changes are picked up per call."""
+    return config.get_connection_string()
 
 # ============================================================================
 # Password Management
@@ -138,7 +144,7 @@ def register_user(username, password, invitation_code):
     password_hash = hash_password(password)
 
     try:
-        conn = psycopg2.connect(DB_CONN)
+        conn = psycopg2.connect(_db_conn())
         cursor = conn.cursor()
 
         # Check if username already exists
@@ -180,7 +186,7 @@ def authenticate_user(username, password):
         tuple: (success: bool, message: str, user_id: int or None)
     """
     try:
-        conn = psycopg2.connect(DB_CONN)
+        conn = psycopg2.connect(_db_conn())
         cursor = conn.cursor()
 
         # Fetch user by username

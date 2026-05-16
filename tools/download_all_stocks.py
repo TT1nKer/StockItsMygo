@@ -94,9 +94,9 @@ def download_all_stocks():
     # Check PostgreSQL database size
     import psycopg2
     try:
-        conn = psycopg2.connect('host=localhost port=5432 dbname=stock_db user=stock_user password=stock_password')
+        conn = psycopg2.connect(config.get_connection_string())
         cursor = conn.cursor()
-        cursor.execute("SELECT pg_size_pretty(pg_database_size('stock_db'))")
+        cursor.execute("SELECT pg_size_pretty(pg_database_size(%s))", (config.PG_DATABASE,))
         db_size = cursor.fetchone()[0]
         print(f"\nPostgreSQL database size: {db_size}")
         conn.close()
