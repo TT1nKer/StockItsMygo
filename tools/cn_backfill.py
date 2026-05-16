@@ -116,16 +116,17 @@ def _process_one(args) -> tuple:
 # ============================================================================
 
 def _coverage_per_symbol(conn) -> dict:
+    """Return {symbol: (min_date_or_None, max_date_or_None, first_added_or_None)}."""
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT s.symbol, MAX(ph.date)
+            SELECT s.symbol, MIN(ph.date), MAX(ph.date), s.first_added
             FROM stocks s
             LEFT JOIN price_history ph ON s.symbol = ph.symbol
             WHERE s.country = 'CN'
-            GROUP BY s.symbol
+            GROUP BY s.symbol, s.first_added
             ORDER BY s.symbol
         """)
-        return dict(cur.fetchall())
+        return {row[0]: (row[1], row[2], row[3]) for row in cur.fetchall()}
 
 
 def backfill(start: str, end: str, limit: int | None, workers: int) -> int:
@@ -133,16 +134,33 @@ def backfill(start: str, end: str, limit: int | None, workers: int) -> int:
     coverage = _coverage_per_symbol(conn)
     conn.close()
 
+    start_date = datetime.strptime(start, '%Y-%m-%d').date()
     end_date = datetime.strptime(end, '%Y-%m-%d').date()
+    # Trading-day slack: if min_date is within this many days of the
+    # earliest-possible date, treat as no-gap (handles non-trading-day jitter).
+    GAP_SLACK_DAYS = 10
 
     work_items, n_skipped = [], 0
-    for sym, already in coverage.items():
-        if already and (end_date - already).days <= 3:
+    for sym, (min_d, max_d, first_added) in coverage.items():
+        # No data → fetch full window.
+        if max_d is None:
+            work_items.append((sym, start, end))
+            continue
+        # The "earliest data we can reasonably expect" is the later of the
+        # requested start and the symbol's listing date.
+        expected_earliest = (max(start_date, first_added)
+                             if first_added else start_date)
+        # Real gap before what we should have → refetch full range
+        # (UPSERT dedupes the overlap).
+        if (min_d - expected_earliest).days > GAP_SLACK_DAYS:
+            work_items.append((sym, start, end))
+            continue
+        # Existing data covers the start; up-to-date enough to skip.
+        if (end_date - max_d).days <= 3:
             n_skipped += 1
             continue
-        fetch_start = ((already + timedelta(days=1)).isoformat()
-                       if already else start)
-        work_items.append((sym, fetch_start, end))
+        # Top-up tail only.
+        work_items.append((sym, (max_d + timedelta(days=1)).isoformat(), end))
 
     if limit is not None:
         work_items = work_items[:limit]
