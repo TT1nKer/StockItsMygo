@@ -1,0 +1,6 @@
+flask
+pandas
+numpy
+plotly
+psycopg2-binary
+yfinance
