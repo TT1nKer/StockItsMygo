@@ -98,7 +98,8 @@ def _akshare_fetch(symbol: str, start: str, end: str, adjust: str) -> pd.DataFra
         adjust=adjust,
     )
     if df is None or len(df) == 0:
-        raise ValueError(f'AKShare empty for {symbol} (adjust={adjust!r})')
+        # Legitimate empty (no trading days in range), not an error.
+        return pd.DataFrame(columns=['date', 'open', 'high', 'low', 'close', 'volume'])
     df = df.rename(columns=_AKSHARE_COL_MAP)[
         ['date', 'open', 'high', 'low', 'close', 'volume']
     ].copy()
@@ -123,7 +124,7 @@ def _baostock_fetch(symbol: str, start: str, end: str) -> pd.DataFrame:
             raise RuntimeError(f'Baostock error {rs.error_code}: {rs.error_msg}')
         df = rs.get_data()
         if len(df) == 0:
-            raise ValueError(f'Baostock empty for {symbol}')
+            return pd.DataFrame(columns=['date', 'open', 'high', 'low', 'close', 'volume'])
         for col in ('open', 'high', 'low', 'close'):
             df[col] = pd.to_numeric(df[col], errors='coerce')
         df['volume'] = pd.to_numeric(df['volume'], errors='coerce').astype('Int64')
@@ -175,6 +176,11 @@ def fetch_daily(
                 f'Both sources failed for {symbol}: '
                 f'akshare={ak_err!r}, baostock={bs_err!r}'
             ) from bs_err
+
+    if df.empty:
+        # No trading days in range (e.g., incremental fetch over a weekend).
+        return pd.DataFrame(columns=['symbol', 'date', 'open', 'high', 'low',
+                                      'close', 'volume', 'adj_factor'])
 
     df['symbol'] = canonical
     df['adj_factor'] = 1.0
@@ -288,10 +294,17 @@ def write_price_history(df: pd.DataFrame, conn) -> int:
     if df.empty:
         return 0
     # Convert numpy scalars to Python natives — psycopg2 can't adapt numpy.int64.
+    # NA / NaN values (typical on 停牌 days) become Python None → PG NULL.
+    def _f(x):  # float-or-null
+        return None if pd.isna(x) else float(x)
+
+    def _i(x):  # int-or-null
+        return None if pd.isna(x) else int(x)
+
     rows = [
         (str(r.symbol), r.date,
-         float(r.open), float(r.high), float(r.low), float(r.close),
-         int(r.volume), float(r.adj_factor))
+         _f(r.open), _f(r.high), _f(r.low), _f(r.close),
+         _i(r.volume), _f(r.adj_factor))
         for r in df[['symbol', 'date', 'open', 'high', 'low', 'close',
                       'volume', 'adj_factor']].itertuples(index=False)
     ]
