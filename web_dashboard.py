@@ -168,7 +168,7 @@ def get_top_movers():
                     'symbol': symbol,
                     'price': round(latest['close'], 2),
                     'change': round(change_pct, 2),
-                    'volume': int(latest['volume']),
+                    'volume': int(latest['volume']) if pd.notna(latest['volume']) else 0,
                     'links': get_stock_links(symbol)
                 })
 
@@ -230,7 +230,7 @@ def get_stock_data(symbol):
             'change_1d': round(change_1d, 2),
             'change_5d': round(change_5d, 2),
             'change_1m': round(change_1m, 2),
-            'volume': int(latest['volume']),
+            'volume': int(latest['volume']) if pd.notna(latest['volume']) else 0,
             'high_52w': round(high_52w, 2),
             'low_52w': round(low_52w, 2),
             'total_records': len(history),
@@ -397,7 +397,7 @@ def get_user_watchlist():
                     'days_remaining': (target_date - datetime.now().date()).days if target_date else None,
                     'notes': notes,
                     'position_type': position_type,
-                    'volume': int(latest['volume']),
+                    'volume': int(latest['volume']) if pd.notna(latest['volume']) else 0,
                     'links': get_stock_links(symbol)
                 })
 
