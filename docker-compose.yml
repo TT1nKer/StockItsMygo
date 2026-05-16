@@ -35,3 +35,44 @@ services:
       - random_page_cost=1.1
       - -c
       - effective_io_concurrency=200
+
+  # China A-shares container (cn-a-shares branch only).
+  # Same image + tuning as `timescaledb`, but isolated DB + port so US-stock
+  # data on 5432 stays untouched. App switches to this via env:
+  #   STOCK_PG_PORT=5433 STOCK_PG_DATABASE=stock_db_cn python web_dashboard.py
+  timescaledb-cn:
+    image: timescale/timescaledb:latest-pg16
+    container_name: strategy-z-pg-cn
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: stock_password
+      POSTGRES_DB: stock_db_cn
+      POSTGRES_USER: stock_user
+      TZ: Asia/Shanghai
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./pg-data-cn:/var/lib/postgresql/data
+      - ./db/pg-config/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200

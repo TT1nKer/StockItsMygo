@@ -49,3 +49,4 @@ nul
 *.tmp
 *.temp
 pg-data/
+pg-data-cn/
