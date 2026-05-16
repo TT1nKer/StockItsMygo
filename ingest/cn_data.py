@@ -199,19 +199,84 @@ def fetch_daily(
 # ============================================================================
 
 def ensure_stock(symbol: str, conn, name: str | None = None) -> None:
-    """Insert minimal stock row if missing. No-op if symbol already present."""
+    """Insert minimal stock row if missing. No-op if symbol already present.
+    first_added left NULL — populate_stocks() fills it from the real listing date.
+    """
     canonical = normalize_symbol(symbol)
     exchange = 'SSE' if canonical.startswith('sh') else 'SZSE'
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO stocks (symbol, security_name, exchange, country, is_active, first_added)
-            VALUES (%s, %s, %s, %s, 1, CURRENT_DATE)
+            INSERT INTO stocks (symbol, security_name, exchange, country, is_active)
+            VALUES (%s, %s, %s, %s, 1)
             ON CONFLICT (symbol) DO NOTHING
             """,
             (canonical, name, exchange, 'CN'),
         )
     conn.commit()
+
+
+def fetch_universe() -> pd.DataFrame:
+    """
+    Fetch the A-share symbol universe (上交所主板 + 深交所主板/中小板/创业板).
+    Excludes STAR Market (科创板) and BSE (北交所) — see project_goal_evolution
+    memory for the scoping decision.
+
+    Returns DataFrame columns: symbol, name, listing_date, exchange, market_category.
+    """
+    sh = ak.stock_info_sh_name_code(symbol='主板A股')
+    sh_df = pd.DataFrame({
+        'code': sh['证券代码'].astype(str),
+        'name': sh['证券简称'].str.strip(),
+        'listing_date': pd.to_datetime(sh['上市日期'], errors='coerce'),
+        'exchange': 'SSE',
+        'market_category': '主板',
+    })
+
+    sz = ak.stock_info_sz_name_code(symbol='A股列表')
+    sz_df = pd.DataFrame({
+        'code': sz['A股代码'].astype(str),
+        'name': sz['A股简称'].astype(str).str.replace(r'\s+', '', regex=True),
+        'listing_date': pd.to_datetime(sz['A股上市日期'], errors='coerce'),
+        'exchange': 'SZSE',
+        # 板块 values are typically '主板' / '中小企业板' / '创业板'
+        'market_category': sz['板块'].astype(str).str.replace('中小企业板', '中小板'),
+    })
+
+    combined = pd.concat([sh_df, sz_df], ignore_index=True)
+    combined['symbol'] = combined['code'].apply(normalize_symbol)
+    return combined[['symbol', 'name', 'listing_date', 'exchange', 'market_category']]
+
+
+def populate_stocks(conn) -> int:
+    """Bulk-upsert the full A-share universe into stocks. Returns rows written."""
+    from psycopg2.extras import execute_values
+    df = fetch_universe()
+    rows = [
+        (r.symbol, r.name, r.exchange, 'CN', r.market_category,
+         r.listing_date.date() if pd.notna(r.listing_date) else None)
+        for r in df.itertuples(index=False)
+    ]
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            """
+            INSERT INTO stocks
+                (symbol, security_name, exchange, country, market_category, first_added)
+            VALUES %s
+            ON CONFLICT (symbol) DO UPDATE SET
+                security_name   = EXCLUDED.security_name,
+                exchange        = EXCLUDED.exchange,
+                market_category = EXCLUDED.market_category,
+                -- Prefer the real listing date from the universe API; fall back
+                -- to whatever was already there (typically NULL).
+                first_added     = COALESCE(EXCLUDED.first_added, stocks.first_added)
+            """,
+            rows,
+            page_size=1000,
+        )
+    conn.commit()
+    return len(rows)
 
 
 def write_price_history(df: pd.DataFrame, conn) -> int:
