@@ -192,3 +192,61 @@ def fetch_daily(
             pass  # leave adj_factor = 1.0
 
     return df[['symbol', 'date', 'open', 'high', 'low', 'close', 'volume', 'adj_factor']]
+
+
+# ============================================================================
+# Database writers (idempotent)
+# ============================================================================
+
+def ensure_stock(symbol: str, conn, name: str | None = None) -> None:
+    """Insert minimal stock row if missing. No-op if symbol already present."""
+    canonical = normalize_symbol(symbol)
+    exchange = 'SSE' if canonical.startswith('sh') else 'SZSE'
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO stocks (symbol, security_name, exchange, country, is_active, first_added)
+            VALUES (%s, %s, %s, %s, 1, CURRENT_DATE)
+            ON CONFLICT (symbol) DO NOTHING
+            """,
+            (canonical, name, exchange, 'CN'),
+        )
+    conn.commit()
+
+
+def write_price_history(df: pd.DataFrame, conn) -> int:
+    """
+    Bulk-upsert price_history rows. Returns number of rows written.
+    DataFrame must have columns: symbol, date, open, high, low, close, volume, adj_factor.
+    """
+    from psycopg2.extras import execute_values
+    if df.empty:
+        return 0
+    # Convert numpy scalars to Python natives — psycopg2 can't adapt numpy.int64.
+    rows = [
+        (str(r.symbol), r.date,
+         float(r.open), float(r.high), float(r.low), float(r.close),
+         int(r.volume), float(r.adj_factor))
+        for r in df[['symbol', 'date', 'open', 'high', 'low', 'close',
+                      'volume', 'adj_factor']].itertuples(index=False)
+    ]
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            """
+            INSERT INTO price_history
+                (symbol, date, open, high, low, close, volume, adj_factor)
+            VALUES %s
+            ON CONFLICT (symbol, date) DO UPDATE SET
+                open       = EXCLUDED.open,
+                high       = EXCLUDED.high,
+                low        = EXCLUDED.low,
+                close      = EXCLUDED.close,
+                volume     = EXCLUDED.volume,
+                adj_factor = EXCLUDED.adj_factor
+            """,
+            rows,
+            page_size=1000,
+        )
+    conn.commit()
+    return len(rows)
