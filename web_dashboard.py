@@ -41,14 +41,35 @@ config.switch_to_postgresql()
 db = StockDB()
 
 def get_stock_links(symbol):
-    """Generate links to popular financial websites"""
+    """Generate links to financial sites — A-share canonical symbols
+    ('sh600519' / 'sz000001') route to CN sites; everything else to US sites."""
+    sym = symbol.lower()
+    if sym.startswith('sh') and sym[2:].isdigit():
+        code = sym[2:]
+        return {
+            'eastmoney': f'https://quote.eastmoney.com/sh{code}.html',
+            'xueqiu':    f'https://xueqiu.com/S/SH{code}',
+            'sina':      f'https://finance.sina.com.cn/realstock/company/sh{code}/nc.shtml',
+            '10jqka':    f'http://stockpage.10jqka.com.cn/{code}/',
+            'tdx':       f'https://wpt.tdx.com.cn/site/site_dataapp/qq_stk_diary?code={code}.SH',
+        }
+    if sym.startswith('sz') and sym[2:].isdigit():
+        code = sym[2:]
+        return {
+            'eastmoney': f'https://quote.eastmoney.com/sz{code}.html',
+            'xueqiu':    f'https://xueqiu.com/S/SZ{code}',
+            'sina':      f'https://finance.sina.com.cn/realstock/company/sz{code}/nc.shtml',
+            '10jqka':    f'http://stockpage.10jqka.com.cn/{code}/',
+            'tdx':       f'https://wpt.tdx.com.cn/site/site_dataapp/qq_stk_diary?code={code}.SZ',
+        }
+    # US / default
     return {
-        'yahoo': f'https://finance.yahoo.com/quote/{symbol}',
-        'finviz': f'https://finviz.com/quote.ashx?t={symbol}',
-        'marketwatch': f'https://www.marketwatch.com/investing/stock/{symbol}',
+        'yahoo':         f'https://finance.yahoo.com/quote/{symbol}',
+        'finviz':        f'https://finviz.com/quote.ashx?t={symbol}',
+        'marketwatch':   f'https://www.marketwatch.com/investing/stock/{symbol}',
         'seeking_alpha': f'https://seekingalpha.com/symbol/{symbol}',
-        'tradingview': f'https://www.tradingview.com/symbols/{symbol}/',
-        'google': f'https://www.google.com/finance/quote/{symbol}:NASDAQ'
+        'tradingview':   f'https://www.tradingview.com/symbols/{symbol}/',
+        'google':        f'https://www.google.com/finance/quote/{symbol}:NASDAQ',
     }
 
 @app.route('/')
@@ -263,9 +284,16 @@ def search_stocks():
         for symbol in stocks:
             if query in symbol:
                 stock_info = db.get_stock_info(symbol)
+                # Fall back to security_name when company_name is missing —
+                # A-share ingest populates security_name (e.g. '贵州茅台') but not company_name.
+                name = ''
+                if stock_info:
+                    name = (stock_info.get('company_name')
+                            or stock_info.get('security_name')
+                            or '')
                 matches.append({
                     'symbol': symbol,
-                    'name': stock_info.get('company_name', '') if stock_info else '',
+                    'name': name,
                     'sector': stock_info.get('sector', '') if stock_info else ''
                 })
 
