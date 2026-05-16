@@ -141,7 +141,7 @@ def get_stats():
         return jsonify({
             'total_stocks': total_stocks,
             'stocks_with_data': stocks_with_data,
-            'coverage': round(stocks_with_data / total_stocks * 100, 1),
+            'coverage': round(stocks_with_data / total_stocks * 100, 1) if total_stocks else 0,
             'total_records': total_records,
             'db_size': db_size,
             'latest_date': str(latest_date) if latest_date else 'N/A'
