@@ -5,7 +5,7 @@ Supports SQLite and PostgreSQL dual backends
 import os
 
 class DatabaseConfig:
-    DB_TYPE = 'sqlite'  # 'sqlite' or 'postgresql'
+    DB_TYPE = os.environ.get('STOCK_DB_TYPE', 'sqlite')  # 'sqlite' or 'postgresql'
 
     # SQLite config (uses paths.py)
     @property

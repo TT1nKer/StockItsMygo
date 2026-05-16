@@ -597,8 +597,9 @@ if __name__ == '__main__':
     print('Stock Analysis Dashboard')
     print('=' * 70)
     print('\nStarting web server...')
-    print('Dashboard URL: http://localhost:8080')
+    port = int(os.environ.get('DASHBOARD_PORT', 8090))
+    print(f'Dashboard URL: http://localhost:{port}')
     print('\nPress Ctrl+C to stop')
     print('=' * 70)
 
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    app.run(debug=True, host='0.0.0.0', port=port)
