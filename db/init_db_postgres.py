@@ -101,6 +101,11 @@ def init_database(db_path=None):
     cursor.execute(db_connection.create_index('idx_stocks_market_category', 'stocks', ['market_category']))
 
     # ========== 2. 历史价格表 (Hypertable for PostgreSQL) ==========
+    # price_history stores RAW (unadjusted) prices — i.e. what the market
+    # actually printed on the day. adj_factor is the forward-adjustment
+    # multiplier (qfq_close / raw_close). For A-shares this is populated
+    # by the ingest layer; for symbols with no events it stays 1.0.
+    # Query qfq-adjusted close as `close * adj_factor`.
     if config.DB_TYPE == 'sqlite':
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS price_history (
@@ -111,6 +116,7 @@ def init_database(db_path=None):
                 low REAL,
                 close REAL,
                 volume INTEGER,
+                adj_factor REAL DEFAULT 1.0,
                 dividends REAL DEFAULT 0,
                 stock_splits REAL DEFAULT 0,
                 PRIMARY KEY (symbol, date),
@@ -127,6 +133,7 @@ def init_database(db_path=None):
                 low NUMERIC(12, 4),
                 close NUMERIC(12, 4),
                 volume BIGINT,
+                adj_factor NUMERIC(12, 8) DEFAULT 1.0,
                 dividends NUMERIC(10, 6) DEFAULT 0,
                 stock_splits NUMERIC(10, 6) DEFAULT 0,
                 PRIMARY KEY (symbol, date)
