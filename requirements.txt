@@ -4,3 +4,8 @@ numpy
 plotly
 psycopg2-binary
 yfinance
+
+# China A-share data sources (cn-a-shares branch)
+# AKShare is primary; Baostock is fallback for when EastMoney throttles.
+akshare
+baostock
