@@ -107,32 +107,66 @@ def _akshare_fetch(symbol: str, start: str, end: str, adjust: str) -> pd.DataFra
     return df
 
 
-def _baostock_fetch(symbol: str, start: str, end: str) -> pd.DataFrame:
-    """Fetch daily raw OHLCV from Baostock. Returns same shape as _akshare_fetch."""
-    with _suppress_stdout():
-        bs.login()
-    try:
-        rs = bs.query_history_k_data_plus(
-            to_baostock(symbol),
-            'date,open,high,low,close,volume',
-            start_date=start,
-            end_date=end,
-            frequency='d',
-            adjustflag='3',  # 3 = 不复权 raw
-        )
-        if rs.error_code != '0':
-            raise RuntimeError(f'Baostock error {rs.error_code}: {rs.error_msg}')
-        df = rs.get_data()
-        if len(df) == 0:
-            return pd.DataFrame(columns=['date', 'open', 'high', 'low', 'close', 'volume'])
-        for col in ('open', 'high', 'low', 'close'):
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        df['volume'] = pd.to_numeric(df['volume'], errors='coerce').astype('Int64')
-        df['date'] = pd.to_datetime(df['date']).dt.date
-        return df[['date', 'open', 'high', 'low', 'close', 'volume']]
-    finally:
+class BaostockRateLimitError(RuntimeError):
+    """Raised when Baostock returns a code that smells like account-level
+    throttling — caller (e.g. backfill driver) should stop and surface."""
+
+
+# Baostock error codes that mean "back off, you're being rate-limited"
+_BS_RATE_LIMIT_CODES = {'10001003', '10001005', '10001007', '10001008'}
+
+
+class BaostockSession:
+    """Hold one baostock login for many queries.
+
+    Baostock stores the session token at module level, so DON'T nest these
+    or use multiple instances concurrently across processes. Multiple
+    THREADS sharing one session are fine (each query opens its own socket).
+    """
+
+    def __enter__(self):
+        with _suppress_stdout():
+            lg = bs.login()
+        if lg.error_code != '0':
+            raise RuntimeError(f'baostock login failed: {lg.error_code} {lg.error_msg}')
+        return self
+
+    def __exit__(self, *args):
         with _suppress_stdout():
             bs.logout()
+
+
+def _bs_query(symbol: str, start: str, end: str) -> pd.DataFrame:
+    """Query Baostock — caller must hold an active BaostockSession.
+    Returns date/open/high/low/close/volume; empty df if no trading days."""
+    rs = bs.query_history_k_data_plus(
+        to_baostock(symbol),
+        'date,open,high,low,close,volume',
+        start_date=start,
+        end_date=end,
+        frequency='d',
+        adjustflag='3',  # 3 = 不复权 raw
+    )
+    if rs.error_code != '0':
+        if rs.error_code in _BS_RATE_LIMIT_CODES:
+            raise BaostockRateLimitError(
+                f'Baostock rate-limit signal {rs.error_code}: {rs.error_msg}'
+            )
+        raise RuntimeError(f'Baostock error {rs.error_code}: {rs.error_msg}')
+    df = rs.get_data()
+    if len(df) == 0:
+        return pd.DataFrame(columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+    for col in ('open', 'high', 'low', 'close'):
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+    df['volume'] = pd.to_numeric(df['volume'], errors='coerce').astype('Int64')
+    df['date'] = pd.to_datetime(df['date']).dt.date
+    return df[['date', 'open', 'high', 'low', 'close', 'volume']]
+
+
+def _baostock_fetch(symbol: str, start: str, end: str) -> pd.DataFrame:
+    """One-off Baostock fetch with its own login/logout (slow)."""
+    with BaostockSession():
+        return _bs_query(symbol, start, end)
 
 
 # ============================================================================
