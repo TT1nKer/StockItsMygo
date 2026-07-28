@@ -1,10 +1,20 @@
-# 📈 StockItsMygo · 股票分析与监控系统
+<p align="center">
+  <img src="docs/readme-cover.svg" alt="StockItsMygo — personal market watcher" width="100%">
+</p>
 
-> 基于 PostgreSQL + TimescaleDB 的个人股票数据基础设施 · Web 仪表板 · 多用户 watchlist
+<p align="center">
+  <a href="https://ttinker.net">ttinker.net</a> ·
+  <a href="docs/MASTER_README.md">documentation</a> ·
+  <a href="docs/ARCHITECTURE.md">architecture</a>
+</p>
 
-![Status](https://img.shields.io/badge/status-active-success)
-![Python](https://img.shields.io/badge/python-3.10+-blue)
-![Database](https://img.shields.io/badge/database-TimescaleDB%20%7C%20PG16-316192)
+# StockItsMygo
+
+个人使用的股票数据、watchlist 和技术指标实验台。它可以运行，但不是投资产品，也没有生产级安全边界。
+
+| State | Evidence | Current boundary |
+| --- | --- | --- |
+| Hobby tool | Python test files, PostgreSQL/TimescaleDB schema, working Flask dashboard | No CI, complete backtest, rate limiting, or audit log; default credentials and invite code must be replaced before any deployment |
 
 ---
 
