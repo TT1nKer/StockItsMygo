@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" role="img" aria-labelledby="title desc">
+  <title id="title">StockItsMygo — market watcher</title>
+  <desc id="desc">TT1nKer system archive cover for StockItsMygo.</desc>
+  <rect width="1280" height="420" fill="#0B0B0D"/>
+  <path d="M0 1H1280M0 419H1280M44 0V420M1236 0V420" stroke="#303036" stroke-width="1"/>
+  <path d="M44 78H1236" stroke="#303036" stroke-width="1"/>
+  <rect x="44" y="0" width="7" height="78" fill="#799A36"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="700" letter-spacing="2.4">
+    <text x="72" y="47" fill="#F1EFE7">[ 08 / SYSTEM ARCHIVE ]</text>
+    <text x="1208" y="47" fill="#85858D" text-anchor="end">TT1NKER.NET</text>
+  </g>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="72" y="210" fill="#F1EFE7" font-size="96" font-weight="800" letter-spacing="-4">StockItsMygo</text>
+    <text x="75" y="256" fill="#929299" font-size="18" font-weight="500" letter-spacing=".5">MARKET WATCHER</text>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" font-weight="700" letter-spacing="2">
+    <text x="74" y="355" fill="#85858D">STATE</text>
+    <text x="132" y="355" fill="#799A36">HOBBY TOOL</text>
+    <text x="74" y="384" fill="#85858D">OWNER</text>
+    <text x="132" y="384" fill="#F1EFE7">TT1NKER</text>
+  </g>
+  
+    <g stroke="#5B5B62" stroke-width="1"><path d="M755 145H1135"/><path d="M755 205H1135"/><path d="M755 265H1135"/><path d="M755 325H1135"/></g>
+    <g stroke="#F1EFE7" stroke-width="3">
+      <path d="M800 285V220M845 260V165M890 300V245M935 245V125M980 280V190M1025 230V150M1070 270V205"/>
+    </g>
+    <g fill="#799A36">
+      <rect x="789" y="220" width="22" height="38"/><rect x="834" y="165" width="22" height="56"/>
+      <rect x="879" y="245" width="22" height="28"/><rect x="924" y="125" width="22" height="69"/>
+      <rect x="969" y="190" width="22" height="44"/><rect x="1014" y="150" width="22" height="52"/>
+      <rect x="1059" y="205" width="22" height="39"/>
+    </g>
+</svg>
