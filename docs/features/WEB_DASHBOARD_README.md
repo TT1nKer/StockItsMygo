@@ -52,10 +52,10 @@ python web_dashboard.py
 
 ### 2. Open in Browser
 
-Visit: **http://localhost:8080**
+Visit: **http://localhost:8090**
 
 Or access from other devices on your network:
-- **http://192.168.2.236:8080** (your local IP)
+- **http://192.168.2.236:8090** (your local IP)
 
 ---
 
@@ -162,7 +162,7 @@ popular_stocks = ['AAPL', 'TSLA', 'YOUR_STOCK_HERE']
 Edit `web_dashboard.py` line 240:
 
 ```python
-app.run(debug=True, host='0.0.0.0', port=8080)
+app.run(debug=True, host='0.0.0.0', port=8090)
 # Change to:
 app.run(debug=True, host='0.0.0.0', port=YOUR_PORT)
 ```
@@ -199,11 +199,11 @@ Optimized layout for smartphones and tablets.
 
 ### Port Already in Use
 
-If port 8080 is occupied:
+If port 8090 is occupied:
 
 ```bash
 # Check what's using the port
-lsof -i :8080
+lsof -i :8090
 
 # Kill the process
 kill -9 <PID>
@@ -253,7 +253,7 @@ If the dashboard is slow:
 3. **Use production WSGI server** instead of Flask development server:
    ```bash
    pip install gunicorn
-   gunicorn -w 4 -b 0.0.0.0:8080 web_dashboard:app
+   gunicorn -w 4 -b 0.0.0.0:8090 web_dashboard:app
    ```
 
 ---
@@ -271,7 +271,7 @@ For production use:
 
 1. **Disable debug mode**:
    ```python
-   app.run(debug=False, host='0.0.0.0', port=8080)
+   app.run(debug=False, host='0.0.0.0', port=8090)
    ```
 
 2. **Use production server**:

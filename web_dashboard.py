@@ -27,6 +27,11 @@ app = Flask(__name__)
 
 # Configure session (secret key for session encryption)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-key-CHANGE-IN-PRODUCTION-b8f3d2e1a9c4')
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=os.environ.get('FLASK_COOKIE_SECURE', '').lower() in ('1', 'true', 'yes'),
+)
 
 # Global variable to track update progress
 update_status = {
@@ -88,7 +93,7 @@ def index():
 def login():
     """Login page and authentication handler"""
     if request.method == 'POST':
-        data = request.json
+        data = request.get_json(silent=True) or {}
         username = data.get('username')
         password = data.get('password')
 
@@ -109,7 +114,7 @@ def login():
 @app.route('/register', methods=['POST'])
 def register():
     """User registration endpoint"""
-    data = request.json
+    data = request.get_json(silent=True) or {}
     username = data.get('username')
     password = data.get('password')
     invitation_code = data.get('invitation_code')
@@ -169,6 +174,21 @@ def get_stats():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/health')
+def health_check():
+    """Small readiness endpoint used by Docker and deployment platforms."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(config.get_connection_string())
+        cursor = conn.cursor()
+        cursor.execute('SELECT 1')
+        cursor.fetchone()
+        conn.close()
+        return jsonify({'status': 'ok', 'database': 'connected'})
+    except Exception:
+        return jsonify({'status': 'error', 'database': 'unavailable'}), 503
 
 @app.route('/api/top_movers')
 def get_top_movers():
@@ -443,7 +463,7 @@ def add_to_watchlist():
         from datetime import datetime, timedelta
 
         user_id = get_current_user_id()
-        data = request.json
+        data = request.get_json(silent=True) or {}
         symbol = data.get('symbol')
         notes = data.get('notes', '')
         days = data.get('days', 14)
@@ -456,6 +476,11 @@ def add_to_watchlist():
 
         if not symbol:
             return jsonify({'error': 'Symbol required'}), 400
+
+        try:
+            days = max(1, min(int(days), 365))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'days must be an integer between 1 and 365'}), 400
 
         conn = psycopg2.connect(config.get_connection_string())
         cursor = conn.cursor()
@@ -514,14 +539,14 @@ def run_update_background():
     import subprocess
 
     try:
-        venv_python = os.path.join(os.getcwd(), 'venv', 'bin', 'python')
+        python_executable = sys.executable
 
         # Step 1: Update price data
         update_status['current_step'] = 'Downloading latest price data (last 5 days)...'
         update_status['progress'].append(update_status['current_step'])
 
         result = subprocess.Popen(
-            [venv_python, '-u', 'tools/update_recent_data.py', '--days', '5', '--yes'],
+            [python_executable, '-u', 'tools/update_recent_data.py', '--days', '5', '--yes'],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -550,7 +575,7 @@ def run_update_background():
         update_status['progress'].append(update_status['current_step'])
 
         rec_result = subprocess.Popen(
-            [venv_python, '-u', 'strategy_recommender_fast.py'],  # Use fast version!
+            [python_executable, '-u', 'strategy_recommender_fast.py'],  # Use fast version!
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -581,6 +606,7 @@ def run_update_background():
         update_status['running'] = False
 
 @app.route('/api/update', methods=['POST'])
+@login_required
 def update_data():
     """Start data update in background"""
     global update_status
@@ -610,6 +636,7 @@ def update_data():
     })
 
 @app.route('/api/update/status', methods=['GET'])
+@login_required
 def update_progress():
     """Get current update progress"""
     global update_status
@@ -630,4 +657,5 @@ if __name__ == '__main__':
     print('\nPress Ctrl+C to stop')
     print('=' * 70)
 
-    app.run(debug=True, host='0.0.0.0', port=port)
+    debug = os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes')
+    app.run(debug=debug, host='0.0.0.0', port=port)

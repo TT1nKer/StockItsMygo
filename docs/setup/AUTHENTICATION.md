@@ -18,7 +18,7 @@ StockItsMygo 支持多用户登录，每个用户有独立的 watchlist。使用
 ## 注册新用户
 
 ### 步骤
-1. 访问 http://localhost:8080
+1. 访问 http://localhost:8090
 2. 点击 "New User? Register here"
 3. 填写信息：
    - Username（最少 3 个字符）

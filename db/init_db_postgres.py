@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.database import config
 from db.connection import db_connection
+from werkzeug.security import generate_password_hash
 
 
 def init_database(db_path=None):
@@ -140,6 +141,13 @@ def init_database(db_path=None):
             )
         ''')
 
+        # Idempotent schema upgrade for databases created before adj_factor was
+        # introduced on the cn-a-shares branch.
+        cursor.execute('''
+            ALTER TABLE price_history
+            ADD COLUMN IF NOT EXISTS adj_factor NUMERIC(12, 8) DEFAULT 1.0
+        ''')
+
         # Convert to TimescaleDB Hypertable
         try:
             cursor.execute("""
@@ -172,6 +180,7 @@ def init_database(db_path=None):
     _create_users_table(cursor)
     _create_user_watchlist_table(cursor)
     _create_daily_reports_table(cursor)
+    _create_daily_recommendations_table(cursor)
 
     # 恢复外键约束
     if config.DB_TYPE == 'postgresql':
@@ -188,8 +197,8 @@ def init_database(db_path=None):
     print("  Analyst tables: analyst_ratings, price_targets, institutional_holders, insider_transactions")
     print("  Options/Indicators tables: options_chain, technical_indicators")
     print("  Auth/Watchlist tables: users, user_watchlist")
-    print("  Intraday/Report tables: intraday_price, daily_reports")
-    print("  Total tables: 17")
+    print("  Intraday/Report tables: intraday_price, daily_reports, daily_recommendations")
+    print("  Total tables: 18")
 
     if config.DB_TYPE == 'postgresql':
         print("  ✓ TimescaleDB Hypertable: price_history")
@@ -661,15 +670,15 @@ def _create_users_table(cursor):
         )
     ''')
 
-    # Seed default admin (username=admin, password=admin123).
-    # WARNING: change immediately after first login.
+    # Seed the local demo admin. Fresh deployments can override the password
+    # without modifying source code.
+    admin_password = os.environ.get('STOCK_ADMIN_PASSWORD', 'admin123')
+    admin_password_hash = generate_password_hash(admin_password, method='pbkdf2:sha256')
     cursor.execute('''
         INSERT INTO users (id, username, password_hash, is_active)
-        VALUES (1, 'admin',
-                'pbkdf2:sha256:1000000$uMOZ8onbVuFAXc1o$a939111536d66f12773b530fa038eb193f785261dcf52148aeed38607eae0232',
-                true)
+        VALUES (1, 'admin', %s, true)
         ON CONFLICT (id) DO NOTHING
-    ''')
+    ''', (admin_password_hash,))
     cursor.execute("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users))")
 
 
@@ -732,6 +741,52 @@ def _create_daily_reports_table(cursor):
 
     cursor.execute(db_connection.create_index('idx_daily_reports_date', 'daily_reports', ['report_date']))
     cursor.execute(db_connection.create_index('idx_daily_reports_type', 'daily_reports', ['report_type']))
+
+
+def _create_daily_recommendations_table(cursor):
+    """Create the table consumed by the dashboard recommendation endpoint."""
+    if config.DB_TYPE == 'sqlite':
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS daily_recommendations (
+                symbol TEXT NOT NULL,
+                recommendation_date DATE NOT NULL,
+                price REAL,
+                score INTEGER NOT NULL,
+                signals TEXT,
+                rsi REAL,
+                momentum_10d REAL,
+                momentum_20d REAL,
+                volume_trend REAL,
+                is_breakout INTEGER DEFAULT 0,
+                has_volume_surge INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (symbol, recommendation_date)
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS daily_recommendations (
+                symbol VARCHAR(20) NOT NULL,
+                recommendation_date DATE NOT NULL,
+                price NUMERIC(12, 4),
+                score INTEGER NOT NULL CHECK (score BETWEEN 0 AND 100),
+                signals TEXT[] DEFAULT '{}',
+                rsi NUMERIC(8, 4),
+                momentum_10d NUMERIC(10, 4),
+                momentum_20d NUMERIC(10, 4),
+                volume_trend NUMERIC(10, 4),
+                is_breakout BOOLEAN DEFAULT false,
+                has_volume_surge BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (symbol, recommendation_date)
+            )
+        ''')
+
+    cursor.execute(db_connection.create_index(
+        'idx_daily_recommendations_date_score',
+        'daily_recommendations',
+        ['recommendation_date', 'score']
+    ))
 
 
 if __name__ == "__main__":

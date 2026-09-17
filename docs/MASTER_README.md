@@ -124,7 +124,7 @@ StockItsMygo/
 
 ## 🔧 技术栈
 
-- **数据库**: PostgreSQL 13 + TimescaleDB
+- **数据库**: PostgreSQL 16 + TimescaleDB
 - **后端**: Python 3.x + Flask
 - **前端**: HTML/CSS/JavaScript (原生)
 - **图表**: Plotly.js

@@ -232,8 +232,8 @@ python web_dashboard.py
 
 **预期输出**:
 ```
-* Running on http://localhost:8080
-* Running on http://192.168.x.x:8080
+* Running on http://localhost:8090
+* Running on http://192.168.x.x:8090
 ```
 
 ### 方法 2: 后台运行（推荐）
@@ -250,7 +250,7 @@ start /B python web_dashboard.py > logs\flask.log 2>&1
 
 打开浏览器，访问:
 ```
-http://localhost:8080
+http://localhost:8090
 ```
 
 **默认登录账号**:
@@ -290,7 +290,7 @@ print(f'✓ Database connected: {len(stocks)} stocks')
 ### 3. 检查 Web 服务器
 
 ```bash
-curl http://localhost:8080
+curl http://localhost:8090
 ```
 
 **预期**: 返回 HTML 内容（登录页面）
@@ -423,15 +423,15 @@ pip install yfinance
 arch -arm64 pip install psycopg2-binary
 ```
 
-### Q4: 端口 8080 已被占用
+### Q4: 端口 8090 已被占用
 
-**问题**: `Address already in use: 8080`
+**问题**: `Address already in use: 8090`
 
 **解决**:
 ```bash
 # 查找占用端口的进程
-lsof -i :8080  # macOS/Linux
-netstat -ano | findstr :8080  # Windows
+lsof -i :8090  # macOS/Linux
+netstat -ano | findstr :8090  # Windows
 
 # 杀死进程
 kill -9 <PID>  # macOS/Linux
@@ -573,7 +573,7 @@ FROM price_history;
 ```
 ┌─────────────────────────────────────────────┐
 │           用户浏览器 (Browser)               │
-│         http://localhost:8080                │
+│         http://localhost:8090                │
 └──────────────────┬──────────────────────────┘
                    │
                    ▼
