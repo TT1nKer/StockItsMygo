@@ -2,7 +2,7 @@
 
 **Created**: 2025-12-31
 **Last Updated**: 2025-12-31 (v2.1 stability & boundary fixes)
-**Status**: Production Ready
+**Status**: Research Prototype
 **Architecture Version**: 2.1
 **Change Type**: Stability & Boundary Fix
 **Backward Compatibility**: Yes (with migration notes)
@@ -819,7 +819,7 @@ if c.source == 'both':
 
 **Last Updated**: 2025-12-31 (v2.1.1)
 **Architecture Version**: 2.1.1
-**Status**: ✅ Production Ready
+**Status**: ✅ Research Prototype
 **Backward Compatibility**: Yes (with migration notes)
 
 **v2.1.1 Changes**:

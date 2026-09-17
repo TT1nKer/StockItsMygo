@@ -4,5 +4,5 @@ CREATE EXTENSION IF NOT EXISTS timescaledb;
 -- Set timezone
 SET timezone = 'UTC';
 
--- Enable automatic statistics collection
-ALTER DATABASE stock_db SET default_statistics_target = 100;
+-- Database-specific settings are configured by PostgreSQL defaults.  Do not
+-- hard-code a database name here: this file is also used by stock_db_cn.

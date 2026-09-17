@@ -8,9 +8,9 @@
 
 | 方式 | URL | 适用场景 | 需要配置 |
 |------|-----|----------|----------|
-| 本地 | `http://localhost:8080` | 只有你自己 | 无 |
-| 局域网 | `http://192.168.x.x:8080` | 同一 WiFi 的朋友 | Mac 防火墙 |
-| 端口转发 | `http://公网IP:8080` | 任何地方（有路由器控制权）| 路由器 + 防火墙 |
+| 本地 | `http://localhost:8090` | 只有你自己 | 无 |
+| 局域网 | `http://192.168.x.x:8090` | 同一 WiFi 的朋友 | Mac 防火墙 |
+| 端口转发 | `http://公网IP:8090` | 任何地方（有路由器控制权）| 路由器 + 防火墙 |
 | Ngrok | `https://xxx.ngrok.io` | 任何地方（无路由器控制权）| Ngrok 账号 |
 
 ---
@@ -25,7 +25,7 @@
    python web_dashboard.py
    ```
 
-2. 访问：`http://localhost:8080`
+2. 访问：`http://localhost:8090`
 
 **适用场景**：自己测试使用
 
@@ -53,7 +53,7 @@
 
 4. **朋友访问**
    - 连接同一个 WiFi
-   - 打开浏览器访问：`http://192.168.2.236:8080`
+   - 打开浏览器访问：`http://192.168.2.236:8090`
 
 **适用场景**：朋友来你家，或者公司同事
 
@@ -91,9 +91,9 @@ ifconfig | grep "inet " | grep -v 127.0.0.1
 | 字段 | 值 |
 |------|------|
 | 服务名称 | Stock Dashboard |
-| 外部端口 | 8080 |
+| 外部端口 | 8090 |
 | 内部 IP | 192.168.2.236（你的 Mac IP）|
-| 内部端口 | 8080 |
+| 内部端口 | 8090 |
 | 协议 | TCP |
 | 状态 | 启用 |
 
@@ -111,26 +111,26 @@ curl ifconfig.me
 **本地测试**：
 ```bash
 # Mac 浏览器
-http://localhost:8080
+http://localhost:8090
 ```
 
 **局域网测试**：
 ```bash
 # 手机连接同一 WiFi
-http://192.168.2.236:8080
+http://192.168.2.236:8090
 ```
 
 **外网测试**（最重要）：
 ```bash
 # 手机断开 WiFi，使用 4G/5G
-http://123.45.67.89:8080
+http://123.45.67.89:8090
 ```
 
 如果能看到登录页面 → ✅ 配置成功！
 
 #### 6. 分享给朋友
 ```
-访问地址：http://123.45.67.89:8080
+访问地址：http://123.45.67.89:8090
 邀请码：stocktest2026
 ```
 
@@ -144,7 +144,7 @@ http://123.45.67.89:8080
 - [ ] 路由器端口转发规则已保存并启用
 - [ ] 路由器已重启（如果刚配置）
 
-❌ **某些运营商屏蔽 8080 端口？**：
+❌ **某些运营商屏蔽 8090 端口？**：
 尝试换成 9090：
 1. 修改 `web_dashboard.py` 最后一行：`port=9090`
 2. 修改路由器端口转发：外部端口改成 9090
@@ -197,14 +197,14 @@ python web_dashboard.py
 #### 终端 2：启动 Ngrok
 打开新终端窗口：
 ```bash
-ngrok http 8080
+ngrok http 8090
 ```
 
 会显示类似：
 ```
 ngrok
 
-Forwarding   https://abc123def456.ngrok.io -> http://localhost:8080
+Forwarding   https://abc123def456.ngrok.io -> http://localhost:8090
 ```
 
 **关键信息**：`https://abc123def456.ngrok.io` ← 这就是你的公网地址！
@@ -255,7 +255,7 @@ python web_dashboard.py
 
 # 创建 Ngrok session
 screen -S ngrok
-ngrok http 8080
+ngrok http 8090
 # 按 Ctrl+A 然后 D 分离
 
 # 查看所有 screen
@@ -274,7 +274,7 @@ cd /Users/hostsjim/StockItsMygo
 source venv/bin/activate
 python web_dashboard.py > flask.log 2>&1 &
 sleep 3
-ngrok http 8080 > ngrok.log 2>&1 &
+ngrok http 8090 > ngrok.log 2>&1 &
 echo "✓ 服务已启动"
 ```
 
@@ -304,7 +304,7 @@ A: Ngrok 免费版可能有延迟。可以：
 **Q: Mac 休眠后 Ngrok 断开了**
 A:
 - 系统偏好设置 → 节能 → 防止电脑自动睡眠
-- 或使用 `caffeinate -s ngrok http 8080`
+- 或使用 `caffeinate -s ngrok http 8090`
 
 ### 免费版限制
 - ✅ 带宽：无限制
@@ -335,7 +335,7 @@ cloudflared tunnel create stockdash
 cloudflared tunnel route dns stockdash stocks.example.com
 
 # 运行
-cloudflared tunnel run --url http://localhost:8080 stockdash
+cloudflared tunnel run --url http://localhost:8090 stockdash
 ```
 
 朋友访问：`https://stocks.example.com`

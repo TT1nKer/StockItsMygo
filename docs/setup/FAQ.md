@@ -8,14 +8,14 @@ cd /Users/hostsjim/StockItsMygo
 source venv/bin/activate
 python web_dashboard.py
 ```
-访问 `http://localhost:8080`
+访问 `http://localhost:8090`
 
-### Q: 报错 "Port 8080 is already in use"
+### Q: 报错 "Port 8090 is already in use"
 **原因**: 端口被占用
 **解决方案**:
 ```bash
 # 方法 1: 找到并停止占用进程
-lsof -i :8080
+lsof -i :8090
 kill <PID>
 
 # 方法 2: 换个端口
@@ -82,7 +82,7 @@ for row in cursor.fetchall():
 **最简单方案**: 使用 Ngrok
 ```bash
 # 终端 2
-ngrok http 8080
+ngrok http 8090
 # 分享显示的 https://xxx.ngrok.io 给朋友
 ```
 

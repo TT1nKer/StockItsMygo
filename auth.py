@@ -6,12 +6,13 @@ Provides user registration, login, session management, and route protection.
 from functools import wraps
 from flask import session, redirect, url_for, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
+import os
 import psycopg2
 
 from config.database import config
 
 # Configuration
-INVITATION_CODE = "stocktest2026"
+INVITATION_CODE = os.environ.get("STOCK_INVITATION_CODE", "stocktest2026")
 
 
 def _db_conn():

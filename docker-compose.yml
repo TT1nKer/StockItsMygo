@@ -1,10 +1,10 @@
 services:
   timescaledb:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb:2.27.0-pg16
     container_name: strategy-z-pg
     restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: stock_password
+      POSTGRES_PASSWORD: ${STOCK_PG_PASSWORD:-stock_password}
       POSTGRES_DB: stock_db
       POSTGRES_USER: stock_user
       TZ: UTC
@@ -13,6 +13,11 @@ services:
     volumes:
       - ./pg-data:/var/lib/postgresql/data
       - ./db/pg-config/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stock_user -d stock_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     command:
       - postgres
       - -c
@@ -35,3 +40,30 @@ services:
       - random_page_cost=1.1
       - -c
       - effective_io_concurrency=200
+
+  app:
+    build: .
+    container_name: stockitsmygo-app
+    restart: unless-stopped
+    environment:
+      STOCK_DB_TYPE: postgresql
+      STOCK_PG_HOST: timescaledb
+      STOCK_PG_PORT: 5432
+      STOCK_PG_USER: stock_user
+      STOCK_PG_PASSWORD: ${STOCK_PG_PASSWORD:-stock_password}
+      STOCK_PG_DATABASE: stock_db
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:-local-demo-secret-change-me}
+      STOCK_INVITATION_CODE: ${STOCK_INVITATION_CODE:-stocktest2026}
+      STOCK_ADMIN_PASSWORD: ${STOCK_ADMIN_PASSWORD:-admin123}
+      DASHBOARD_PORT: 8090
+    ports:
+      - "${DASHBOARD_PORT:-8090}:8090"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s

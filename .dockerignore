@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+venv
+__pycache__
+*.py[cod]
+*.log
+.env
+pg-data/
+pg-data/**
+pg-data-cn/
+pg-data-cn/**
+notebooks
+reports
+backup_before_auth_migration_*.sql
